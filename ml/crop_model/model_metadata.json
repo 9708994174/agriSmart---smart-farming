@@ -1,0 +1,38 @@
+{
+  "model_type": "RandomForestClassifier",
+  "n_estimators": 100,
+  "accuracy": 0.9477,
+  "features": [
+    "N",
+    "P",
+    "K",
+    "temperature",
+    "humidity",
+    "ph",
+    "rainfall"
+  ],
+  "classes": [
+    "chickpea",
+    "cotton",
+    "groundnut",
+    "maize",
+    "mustard",
+    "potato",
+    "rice",
+    "soybean",
+    "sugarcane",
+    "tomato",
+    "wheat"
+  ],
+  "feature_importance": {
+    "N": 0.2119,
+    "P": 0.0936,
+    "K": 0.1837,
+    "temperature": 0.1366,
+    "humidity": 0.1061,
+    "ph": 0.0765,
+    "rainfall": 0.1916
+  },
+  "training_samples": 1760,
+  "test_samples": 440
+}
