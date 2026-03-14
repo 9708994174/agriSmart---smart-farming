@@ -2,37 +2,17 @@
 Weather Service - Open-Meteo API Integration
 Free, open-source weather API — NO API key required.
 https://open-meteo.com/en/docs
-
-Uses:
-  - Geocoding API: Convert city names to lat/lon
-  - Forecast API: Get current + hourly + daily weather data
 """
 import httpx
 import time
-from datetime import datetime
 from typing import Optional
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL  = "https://api.open-meteo.com/v1/forecast"
 
-# ── Simple in-memory cache (avoids repeated API hits → prevents 429) ──────────
-_geo_cache: dict   = {}   # city_name → (geo_data, timestamp)   TTL: 24 h
-_weather_cache: dict = {}  # city_name → (weather_data, timestamp) TTL: 5 min
-_GEO_TTL     = 86400  # 24 hours in seconds
-_WEATHER_TTL = 300    # 5 minutes in seconds
-
-
-def _get_geo_cached(city: str) -> Optional[dict]:
-    """Return cached geocode data if still fresh."""
-    entry = _geo_cache.get(city.lower())
-    if entry and (time.time() - entry[1]) < _GEO_TTL:
-        return entry[0]
-    return None
-
-
-def _set_geo_cache(city: str, data: dict):
-    _geo_cache[city.lower()] = (data, time.time())
-
+# ── In-memory weather cache (5-min TTL) — prevents repeated API hits ──────────
+_weather_cache: dict = {}
+_WEATHER_TTL = 300   # 5 minutes
 
 def _get_weather_cached(city: str) -> Optional[dict]:
     entry = _weather_cache.get(city.lower())
@@ -40,9 +20,113 @@ def _get_weather_cached(city: str) -> Optional[dict]:
         return entry[0]
     return None
 
-
 def _set_weather_cache(city: str, data: dict):
     _weather_cache[city.lower()] = (data, time.time())
+
+
+# ── Built-in coordinates for 80+ major Indian cities ──────────────────────────
+# Using these avoids geocoding API calls entirely (no rate-limit risk)
+INDIAN_CITIES: dict = {
+    # North India
+    "delhi":       {"name": "Delhi",       "lat": 28.6139, "lon": 77.2090, "state": "Delhi",          "tz": "Asia/Kolkata"},
+    "new delhi":   {"name": "New Delhi",   "lat": 28.6139, "lon": 77.2090, "state": "Delhi",          "tz": "Asia/Kolkata"},
+    "noida":       {"name": "Noida",       "lat": 28.5355, "lon": 77.3910, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "gurgaon":     {"name": "Gurgaon",     "lat": 28.4595, "lon": 77.0266, "state": "Haryana",        "tz": "Asia/Kolkata"},
+    "gurugram":    {"name": "Gurugram",    "lat": 28.4595, "lon": 77.0266, "state": "Haryana",        "tz": "Asia/Kolkata"},
+    "faridabad":   {"name": "Faridabad",   "lat": 28.4089, "lon": 77.3178, "state": "Haryana",        "tz": "Asia/Kolkata"},
+    "chandigarh":  {"name": "Chandigarh",  "lat": 30.7333, "lon": 76.7794, "state": "Chandigarh",     "tz": "Asia/Kolkata"},
+    "ludhiana":    {"name": "Ludhiana",    "lat": 30.9010, "lon": 75.8573, "state": "Punjab",         "tz": "Asia/Kolkata"},
+    "amritsar":    {"name": "Amritsar",    "lat": 31.6340, "lon": 74.8723, "state": "Punjab",         "tz": "Asia/Kolkata"},
+    "jalandhar":   {"name": "Jalandhar",   "lat": 31.3260, "lon": 75.5762, "state": "Punjab",         "tz": "Asia/Kolkata"},
+    "ambala":      {"name": "Ambala",      "lat": 30.3782, "lon": 76.7767, "state": "Haryana",        "tz": "Asia/Kolkata"},
+    "shimla":      {"name": "Shimla",      "lat": 31.1048, "lon": 77.1734, "state": "Himachal Pradesh","tz": "Asia/Kolkata"},
+    "dehradun":    {"name": "Dehradun",    "lat": 30.3165, "lon": 78.0322, "state": "Uttarakhand",    "tz": "Asia/Kolkata"},
+    "haridwar":    {"name": "Haridwar",    "lat": 29.9457, "lon": 78.1642, "state": "Uttarakhand",    "tz": "Asia/Kolkata"},
+    "srinagar":    {"name": "Srinagar",    "lat": 34.0837, "lon": 74.7973, "state": "J&K",            "tz": "Asia/Kolkata"},
+    "jammu":       {"name": "Jammu",       "lat": 32.7266, "lon": 74.8570, "state": "J&K",            "tz": "Asia/Kolkata"},
+    # UP & Bihar
+    "lucknow":     {"name": "Lucknow",     "lat": 26.8467, "lon": 80.9462, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "kanpur":      {"name": "Kanpur",      "lat": 26.4499, "lon": 80.3319, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "agra":        {"name": "Agra",        "lat": 27.1767, "lon": 78.0081, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "varanasi":    {"name": "Varanasi",    "lat": 25.3176, "lon": 82.9739, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "allahabad":   {"name": "Prayagraj",   "lat": 25.4358, "lon": 81.8463, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "prayagraj":   {"name": "Prayagraj",   "lat": 25.4358, "lon": 81.8463, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "meerut":      {"name": "Meerut",      "lat": 28.9845, "lon": 77.7064, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "gorakhpur":   {"name": "Gorakhpur",   "lat": 26.7606, "lon": 83.3732, "state": "Uttar Pradesh",  "tz": "Asia/Kolkata"},
+    "patna":       {"name": "Patna",       "lat": 25.5941, "lon": 85.1376, "state": "Bihar",          "tz": "Asia/Kolkata"},
+    "gaya":        {"name": "Gaya",        "lat": 24.7914, "lon": 84.9994, "state": "Bihar",          "tz": "Asia/Kolkata"},
+    "muzaffarpur": {"name": "Muzaffarpur", "lat": 26.1209, "lon": 85.3647, "state": "Bihar",          "tz": "Asia/Kolkata"},
+    # Rajasthan
+    "jaipur":      {"name": "Jaipur",      "lat": 26.9124, "lon": 75.7873, "state": "Rajasthan",      "tz": "Asia/Kolkata"},
+    "jodhpur":     {"name": "Jodhpur",     "lat": 26.2389, "lon": 73.0243, "state": "Rajasthan",      "tz": "Asia/Kolkata"},
+    "udaipur":     {"name": "Udaipur",     "lat": 24.5854, "lon": 73.7125, "state": "Rajasthan",      "tz": "Asia/Kolkata"},
+    "ajmer":       {"name": "Ajmer",       "lat": 26.4499, "lon": 74.6399, "state": "Rajasthan",      "tz": "Asia/Kolkata"},
+    "kota":        {"name": "Kota",        "lat": 25.2138, "lon": 75.8648, "state": "Rajasthan",      "tz": "Asia/Kolkata"},
+    # Maharashtra & Goa
+    "mumbai":      {"name": "Mumbai",      "lat": 19.0760, "lon": 72.8777, "state": "Maharashtra",    "tz": "Asia/Kolkata"},
+    "pune":        {"name": "Pune",        "lat": 18.5204, "lon": 73.8567, "state": "Maharashtra",    "tz": "Asia/Kolkata"},
+    "nagpur":      {"name": "Nagpur",      "lat": 21.1458, "lon": 79.0882, "state": "Maharashtra",    "tz": "Asia/Kolkata"},
+    "nashik":      {"name": "Nashik",      "lat": 19.9975, "lon": 73.7898, "state": "Maharashtra",    "tz": "Asia/Kolkata"},
+    "aurangabad":  {"name": "Aurangabad",  "lat": 19.8762, "lon": 75.3433, "state": "Maharashtra",    "tz": "Asia/Kolkata"},
+    "solapur":     {"name": "Solapur",     "lat": 17.6854, "lon": 75.9064, "state": "Maharashtra",    "tz": "Asia/Kolkata"},
+    "kolhapur":    {"name": "Kolhapur",    "lat": 16.7050, "lon": 74.2433, "state": "Maharashtra",    "tz": "Asia/Kolkata"},
+    "goa":         {"name": "Panaji",      "lat": 15.4909, "lon": 73.8278, "state": "Goa",            "tz": "Asia/Kolkata"},
+    "panaji":      {"name": "Panaji",      "lat": 15.4909, "lon": 73.8278, "state": "Goa",            "tz": "Asia/Kolkata"},
+    # South India
+    "bengaluru":   {"name": "Bengaluru",   "lat": 12.9716, "lon": 77.5946, "state": "Karnataka",      "tz": "Asia/Kolkata"},
+    "bangalore":   {"name": "Bengaluru",   "lat": 12.9716, "lon": 77.5946, "state": "Karnataka",      "tz": "Asia/Kolkata"},
+    "mysuru":      {"name": "Mysuru",      "lat": 12.2958, "lon": 76.6394, "state": "Karnataka",      "tz": "Asia/Kolkata"},
+    "mysore":      {"name": "Mysuru",      "lat": 12.2958, "lon": 76.6394, "state": "Karnataka",      "tz": "Asia/Kolkata"},
+    "hubli":       {"name": "Hubli",       "lat": 15.3647, "lon": 75.1240, "state": "Karnataka",      "tz": "Asia/Kolkata"},
+    "mangalore":   {"name": "Mangalore",   "lat": 12.9141, "lon": 74.8560, "state": "Karnataka",      "tz": "Asia/Kolkata"},
+    "hyderabad":   {"name": "Hyderabad",   "lat": 17.3850, "lon": 78.4867, "state": "Telangana",      "tz": "Asia/Kolkata"},
+    "warangal":    {"name": "Warangal",    "lat": 17.9689, "lon": 79.5941, "state": "Telangana",      "tz": "Asia/Kolkata"},
+    "chennai":     {"name": "Chennai",     "lat": 13.0827, "lon": 80.2707, "state": "Tamil Nadu",     "tz": "Asia/Kolkata"},
+    "coimbatore":  {"name": "Coimbatore",  "lat": 11.0168, "lon": 76.9558, "state": "Tamil Nadu",     "tz": "Asia/Kolkata"},
+    "madurai":     {"name": "Madurai",     "lat": 9.9252,  "lon": 78.1198, "state": "Tamil Nadu",     "tz": "Asia/Kolkata"},
+    "trichy":      {"name": "Tiruchirappalli","lat": 10.7905,"lon": 78.7047,"state": "Tamil Nadu",    "tz": "Asia/Kolkata"},
+    "kochi":       {"name": "Kochi",       "lat": 9.9312,  "lon": 76.2673, "state": "Kerala",         "tz": "Asia/Kolkata"},
+    "thiruvananthapuram":{"name":"Thiruvananthapuram","lat":8.5241,"lon":76.9366,"state":"Kerala",    "tz": "Asia/Kolkata"},
+    "trivandrum":  {"name": "Thiruvananthapuram","lat":8.5241,"lon":76.9366,"state":"Kerala",         "tz": "Asia/Kolkata"},
+    "kozhikode":   {"name": "Kozhikode",   "lat": 11.2588, "lon": 75.7804, "state": "Kerala",         "tz": "Asia/Kolkata"},
+    "vishakhapatnam":{"name":"Visakhapatnam","lat":17.6868,"lon":83.2185,"state":"Andhra Pradesh",   "tz": "Asia/Kolkata"},
+    "visakhapatnam":{"name":"Visakhapatnam","lat":17.6868,"lon":83.2185,"state":"Andhra Pradesh",    "tz": "Asia/Kolkata"},
+    "vijayawada":  {"name": "Vijayawada",  "lat": 16.5062, "lon": 80.6480, "state": "Andhra Pradesh", "tz": "Asia/Kolkata"},
+    # East India
+    "kolkata":     {"name": "Kolkata",     "lat": 22.5726, "lon": 88.3639, "state": "West Bengal",    "tz": "Asia/Kolkata"},
+    "calcutta":    {"name": "Kolkata",     "lat": 22.5726, "lon": 88.3639, "state": "West Bengal",    "tz": "Asia/Kolkata"},
+    "bhubaneswar": {"name": "Bhubaneswar", "lat": 20.2961, "lon": 85.8245, "state": "Odisha",         "tz": "Asia/Kolkata"},
+    "cuttack":     {"name": "Cuttack",     "lat": 20.4625, "lon": 85.8828, "state": "Odisha",         "tz": "Asia/Kolkata"},
+    "guwahati":    {"name": "Guwahati",    "lat": 26.1445, "lon": 91.7362, "state": "Assam",          "tz": "Asia/Kolkata"},
+    "ranchi":      {"name": "Ranchi",      "lat": 23.3441, "lon": 85.3096, "state": "Jharkhand",      "tz": "Asia/Kolkata"},
+    "jamshedpur":  {"name": "Jamshedpur",  "lat": 22.8046, "lon": 86.2029, "state": "Jharkhand",      "tz": "Asia/Kolkata"},
+    "raipur":      {"name": "Raipur",      "lat": 21.2514, "lon": 81.6296, "state": "Chhattisgarh",   "tz": "Asia/Kolkata"},
+    # Central & West
+    "bhopal":      {"name": "Bhopal",      "lat": 23.2599, "lon": 77.4126, "state": "Madhya Pradesh", "tz": "Asia/Kolkata"},
+    "indore":      {"name": "Indore",      "lat": 22.7196, "lon": 75.8577, "state": "Madhya Pradesh", "tz": "Asia/Kolkata"},
+    "jabalpur":    {"name": "Jabalpur",    "lat": 23.1815, "lon": 79.9864, "state": "Madhya Pradesh", "tz": "Asia/Kolkata"},
+    "gwalior":     {"name": "Gwalior",     "lat": 26.2183, "lon": 78.1828, "state": "Madhya Pradesh", "tz": "Asia/Kolkata"},
+    "ahmedabad":   {"name": "Ahmedabad",   "lat": 23.0225, "lon": 72.5714, "state": "Gujarat",        "tz": "Asia/Kolkata"},
+    "surat":       {"name": "Surat",       "lat": 21.1702, "lon": 72.8311, "state": "Gujarat",        "tz": "Asia/Kolkata"},
+    "vadodara":    {"name": "Vadodara",    "lat": 22.3072, "lon": 73.1812, "state": "Gujarat",        "tz": "Asia/Kolkata"},
+    "rajkot":      {"name": "Rajkot",      "lat": 22.3039, "lon": 70.8022, "state": "Gujarat",        "tz": "Asia/Kolkata"},
+}
+
+def _lookup_city(city: str) -> Optional[dict]:
+    """Look up city in built-in dictionary (case-insensitive). Returns geo dict or None."""
+    key = city.strip().lower()
+    if key in INDIAN_CITIES:
+        c = INDIAN_CITIES[key]
+        return {
+            "name"        : c["name"],
+            "latitude"    : c["lat"],
+            "longitude"   : c["lon"],
+            "country"     : "India",
+            "country_code": "IN",
+            "admin1"      : c["state"],
+            "timezone"    : c["tz"],
+        }
+    return None
 
 
 # WMO Weather Interpretation Codes → description & icon mapping
@@ -128,75 +212,66 @@ def generate_farming_advice(temp: float, humidity: float, wind: float, descripti
 
 
 async def _geocode_city(city: str) -> Optional[dict]:
-    """Convert city name to lat/lon using Open-Meteo Geocoding API (with cache)"""
-    # Check cache first
-    cached = _get_geo_cached(city)
-    if cached:
-        return cached
+    """Convert city name to lat/lon.
+    1. Check built-in Indian city dictionary first (no API, no rate-limit)
+    2. Fall back to Open-Meteo Geocoding API for unknown cities
+    """
+    # Step 1: built-in lookup (instant, no API call)
+    builtin = _lookup_city(city)
+    if builtin:
+        return builtin
 
-    for attempt in range(2):  # retry once on 429
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    GEOCODING_URL,
-                    params={
-                        "name": city,
-                        "count": 5,
-                        "language": "en",
-                        "format": "json"
-                    }
-                )
-
-                if response.status_code == 429:
-                    if attempt == 0:
-                        import asyncio
-                        await asyncio.sleep(1)
-                        continue
-                    return None
-
-                if response.status_code != 200:
-                    return None
-
-                data    = response.json()
-                results = data.get("results", [])
-
-                if not results:
-                    return None
-
-                # Prefer Indian cities
-                india_match = next((r for r in results if r.get("country_code") == "IN"), None)
-                best = india_match or results[0]
-
-                geo = {
-                    "name"        : best.get("name", city),
-                    "latitude"    : best["latitude"],
-                    "longitude"   : best["longitude"],
-                    "country"     : best.get("country", ""),
-                    "country_code": best.get("country_code", ""),
-                    "admin1"      : best.get("admin1", ""),
-                    "timezone"    : best.get("timezone", "Asia/Kolkata"),
+    # Step 2: geocoding API (only for cities not in our dictionary)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                GEOCODING_URL,
+                params={
+                    "name": city,
+                    "count": 5,
+                    "language": "en",
+                    "format": "json"
                 }
-                _set_geo_cache(city, geo)
-                return geo
+            )
 
-        except Exception as e:
-            print(f"[ERROR] Geocoding failed for '{city}': {e}")
-            return None
-    return None
+            if response.status_code != 200:
+                return None
+
+            data    = response.json()
+            results = data.get("results", [])
+            if not results:
+                return None
+
+            india_match = next((r for r in results if r.get("country_code") == "IN"), None)
+            best = india_match or results[0]
+
+            return {
+                "name"        : best.get("name", city),
+                "latitude"    : best["latitude"],
+                "longitude"   : best["longitude"],
+                "country"     : best.get("country", ""),
+                "country_code": best.get("country_code", ""),
+                "admin1"      : best.get("admin1", ""),
+                "timezone"    : best.get("timezone", "Asia/Kolkata"),
+            }
+
+    except Exception as e:
+        print(f"[ERROR] Geocoding failed for '{city}': {e}")
+        return None
 
 
 async def get_weather(city: str) -> dict:
     """Get current weather data using Open-Meteo API (free, no API key required)"""
 
-    # Return cached weather if fresh (prevents 429 rate-limiting)
+    # Return cached weather if fresh (prevents repeated hits)
     cached = _get_weather_cached(city)
     if cached:
         return cached
 
-    # Geocode city name to lat/lon (also cached for 24 h)
-    geo = await _geocode_city(city)
+    # Resolve city → lat/lon (built-in dict first, then geocoding API fallback)
+    geo = _lookup_city(city) or await _geocode_city(city)
     if not geo:
-        return {"error": True, "msg": f"City '{city}' not found. Please check the spelling and try again."}
+        return {"error": True, "msg": f"City '{city}' not found. Try a nearby major city."}
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
