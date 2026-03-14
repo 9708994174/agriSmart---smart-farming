@@ -20,11 +20,12 @@ export default function ChatbotPage() {
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const utteranceRef = useRef(null);
-  const voiceModeRef = useRef(false);   // Tracks voiceMode for callbacks without stale closure
-  const isSendingRef = useRef(false);   // Prevents duplicate sends in voice mode
-  const isLoadingRef = useRef(false);   // Mirrors loading for recognition callbacks
-  const interruptRef = useRef(null);    // Interruption listener while AI is speaking
+  const voiceModeRef    = useRef(false);   // Tracks voiceMode for callbacks without stale closure
+  const isSendingRef    = useRef(false);   // Prevents duplicate sends in voice mode
+  const isLoadingRef    = useRef(false);   // Mirrors loading for recognition callbacks
+  const interruptRef    = useRef(null);    // Kept for cleanup only (no longer used for echo-prone background mic)
   const speechCancelledRef = useRef(false); // Set true when we manually cancel TTS to stop speakNext chain
+  const isSpeakingRef  = useRef(false);   // Mirrors isSpeaking state for startListening guard
 
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -61,7 +62,8 @@ export default function ChatbotPage() {
   // ─── Text-to-Speech ───
   const speakText = useCallback((text, msgIndex = -1) => {
     if (!('speechSynthesis' in window)) return;
-    speechCancelledRef.current = false;  // Reset cancel flag for new speech
+    speechCancelledRef.current = false;   // Reset cancel flag for new speech
+    isSpeakingRef.current = true;         // Mark as speaking
     window.speechSynthesis.cancel();
 
     // Clean text for natural speech
@@ -80,93 +82,70 @@ export default function ChatbotPage() {
     let currentIdx = 0;
 
     const speakNext = () => {
-      // If manually cancelled (stopSpeaking / interruption), do NOT chain to next sentence
-      if (speechCancelledRef.current) return;
+      // If manually cancelled (stopSpeaking), do NOT chain to next sentence
+      if (speechCancelledRef.current) {
+        isSpeakingRef.current = false;
+        return;
+      }
 
       if (currentIdx >= sentences.length) {
+        // All sentences spoken naturally — done
         setIsSpeaking(false);
         setSpeakingMsgIdx(-1);
-        if (interruptRef.current) { try { interruptRef.current.stop(); } catch {} interruptRef.current = null; }
-        // Auto-restart listening only when naturally finished (not cancelled)
+        isSpeakingRef.current = false;
+        // Auto-restart listening ONLY after a 2-second silence gap
+        // This lets speaker audio dissipate so the mic doesn’t hear its own echo
         if (voiceModeRef.current) {
-          setTimeout(() => startListening(true), 400);
+          setTimeout(() => startListening(true), 2000);
         }
         return;
       }
 
       const utterance = new SpeechSynthesisUtterance(sentences[currentIdx].trim());
-      utterance.lang = speechLangMap[language] || 'en-IN';
-      utterance.rate = voiceSpeed;
-      utterance.pitch = 1.0;
+      utterance.lang   = speechLangMap[language] || 'en-IN';
+      utterance.rate   = voiceSpeed;
+      utterance.pitch  = 1.0;
       utterance.volume = 1;
 
-      const voices = window.speechSynthesis.getVoices();
-      const langCode = utterance.lang.split('-')[0];
+      const voices    = window.speechSynthesis.getVoices();
+      const langCode  = utterance.lang.split('-')[0];
       const matchingVoice =
         voices.find(v => v.lang.startsWith(langCode) && !v.localService) ||
         voices.find(v => v.lang.startsWith(langCode));
       if (matchingVoice) utterance.voice = matchingVoice;
 
-      utterance.onstart = () => {
-        setIsSpeaking(true);
-        setSpeakingMsgIdx(msgIndex);
-      };
+      utterance.onstart = () => { setIsSpeaking(true); setSpeakingMsgIdx(msgIndex); };
 
       utterance.onend = () => {
-        // Only advance to next sentence if NOT manually cancelled
-        if (speechCancelledRef.current) return;
+        if (speechCancelledRef.current) { isSpeakingRef.current = false; return; }
         currentIdx++;
         speakNext();
       };
 
       utterance.onerror = () => {
-        if (!speechCancelledRef.current) {
-          setIsSpeaking(false);
-          setSpeakingMsgIdx(-1);
-        }
+        if (!speechCancelledRef.current) { setIsSpeaking(false); setSpeakingMsgIdx(-1); }
+        isSpeakingRef.current = false;
       };
 
       utteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     };
 
+    // NOTE: Background interruption mic intentionally removed.
+    // It caused an echo loop — the SpeechRecognition mic was picking up the AI’s
+    // own TTS output from speakers and sending it back as a new user message.
+    // Users can still interrupt by tapping the Stop button.
     speakNext();
-
-    // Background interruption mic — only in voice mode
-    if (voiceModeRef.current && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const iRecog = new SR();
-      iRecog.continuous = false;
-      iRecog.interimResults = true;
-      iRecog.maxAlternatives = 1;
-      let interruptFired = false;
-      iRecog.onresult = (event) => {
-        let txt = '';
-        for (let i = event.resultIndex; i < event.results.length; i++)
-          txt += event.results[i][0].transcript;
-        // Only trigger on meaningful speech (10+ chars = at least a short question)
-        if (txt.trim().length > 10 && !interruptFired && !isLoadingRef.current) {
-          interruptFired = true;
-          speechCancelledRef.current = true;  // Prevent speakNext chain
-          window.speechSynthesis.cancel();
-          setIsSpeaking(false); setSpeakingMsgIdx(-1);
-          if (interruptRef.current) { try { interruptRef.current.stop(); } catch {} interruptRef.current = null; }
-          // Process the interruption question
-          setTimeout(() => sendMessage(txt.trim()), 150);
-        }
-      };
-      iRecog.onerror = () => { interruptRef.current = null; };
-      iRecog.onend = () => { interruptRef.current = null; };
-      try { iRecog.start(); interruptRef.current = iRecog; } catch {}
-    }
   }, [language, voiceMode, voiceSpeed]);
 
   // Keep refs in sync
   useEffect(() => { voiceModeRef.current = voiceMode; }, [voiceMode]);
   useEffect(() => { isLoadingRef.current = loading; }, [loading]);
+  useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
 
   const stopSpeaking = useCallback(() => {
     speechCancelledRef.current = true;   // Prevent utterance.onend from chaining
+    isSpeakingRef.current = false;
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
     setSpeakingMsgIdx(-1);
@@ -181,6 +160,8 @@ export default function ChatbotPage() {
     }
     // Don't start a new recognition if one is already active
     if (recognitionRef.current) return;
+    // Don't start listening if AI is currently speaking (prevents echo pickup)
+    if (isSpeakingRef.current) return;
 
     stopSpeaking();
 

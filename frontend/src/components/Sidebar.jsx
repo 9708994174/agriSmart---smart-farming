@@ -131,7 +131,7 @@ export default function Sidebar() {
     return (
       <aside className="sidebar">
         <Link to="/admin?s=dashboard" className="sidebar-logo">
-          <h1>AgriSmart</h1>
+          <h1>AGRISMART</h1>
         </Link>
 
         <nav className="sidebar-nav">
@@ -181,7 +181,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <Link to="/dashboard" className="sidebar-logo">
-        <h1>AgriSmart</h1>
+        <h1>AGRISMART</h1>
       </Link>
 
       <nav className="sidebar-nav">

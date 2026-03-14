@@ -8,11 +8,42 @@ Uses:
   - Forecast API: Get current + hourly + daily weather data
 """
 import httpx
+import time
 from datetime import datetime
 from typing import Optional
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
-FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+FORECAST_URL  = "https://api.open-meteo.com/v1/forecast"
+
+# ── Simple in-memory cache (avoids repeated API hits → prevents 429) ──────────
+_geo_cache: dict   = {}   # city_name → (geo_data, timestamp)   TTL: 24 h
+_weather_cache: dict = {}  # city_name → (weather_data, timestamp) TTL: 5 min
+_GEO_TTL     = 86400  # 24 hours in seconds
+_WEATHER_TTL = 300    # 5 minutes in seconds
+
+
+def _get_geo_cached(city: str) -> Optional[dict]:
+    """Return cached geocode data if still fresh."""
+    entry = _geo_cache.get(city.lower())
+    if entry and (time.time() - entry[1]) < _GEO_TTL:
+        return entry[0]
+    return None
+
+
+def _set_geo_cache(city: str, data: dict):
+    _geo_cache[city.lower()] = (data, time.time())
+
+
+def _get_weather_cached(city: str) -> Optional[dict]:
+    entry = _weather_cache.get(city.lower())
+    if entry and (time.time() - entry[1]) < _WEATHER_TTL:
+        return entry[0]
+    return None
+
+
+def _set_weather_cache(city: str, data: dict):
+    _weather_cache[city.lower()] = (data, time.time())
+
 
 # WMO Weather Interpretation Codes → description & icon mapping
 WMO_CODES = {
@@ -95,60 +126,83 @@ def generate_farming_advice(temp: float, humidity: float, wind: float, descripti
     return advice
 
 
+
 async def _geocode_city(city: str) -> Optional[dict]:
-    """Convert city name to lat/lon using Open-Meteo Geocoding API"""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                GEOCODING_URL,
-                params={
-                    "name": city,
-                    "count": 5,
-                    "language": "en",
-                    "format": "json"
+    """Convert city name to lat/lon using Open-Meteo Geocoding API (with cache)"""
+    # Check cache first
+    cached = _get_geo_cached(city)
+    if cached:
+        return cached
+
+    for attempt in range(2):  # retry once on 429
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    GEOCODING_URL,
+                    params={
+                        "name": city,
+                        "count": 5,
+                        "language": "en",
+                        "format": "json"
+                    }
+                )
+
+                if response.status_code == 429:
+                    if attempt == 0:
+                        import asyncio
+                        await asyncio.sleep(1)
+                        continue
+                    return None
+
+                if response.status_code != 200:
+                    return None
+
+                data    = response.json()
+                results = data.get("results", [])
+
+                if not results:
+                    return None
+
+                # Prefer Indian cities
+                india_match = next((r for r in results if r.get("country_code") == "IN"), None)
+                best = india_match or results[0]
+
+                geo = {
+                    "name"        : best.get("name", city),
+                    "latitude"    : best["latitude"],
+                    "longitude"   : best["longitude"],
+                    "country"     : best.get("country", ""),
+                    "country_code": best.get("country_code", ""),
+                    "admin1"      : best.get("admin1", ""),
+                    "timezone"    : best.get("timezone", "Asia/Kolkata"),
                 }
-            )
+                _set_geo_cache(city, geo)
+                return geo
 
-            if response.status_code != 200:
-                return None
-
-            data = response.json()
-            results = data.get("results", [])
-
-            if not results:
-                return None
-
-            # Prefer Indian cities — check for country_code "IN"
-            india_match = next((r for r in results if r.get("country_code") == "IN"), None)
-            best = india_match or results[0]
-
-            return {
-                "name": best.get("name", city),
-                "latitude": best["latitude"],
-                "longitude": best["longitude"],
-                "country": best.get("country", ""),
-                "country_code": best.get("country_code", ""),
-                "admin1": best.get("admin1", ""),  # state/province
-                "timezone": best.get("timezone", "Asia/Kolkata"),
-            }
-
-    except Exception as e:
-        print(f"[ERROR] Geocoding failed for '{city}': {e}")
-        return None
+        except Exception as e:
+            print(f"[ERROR] Geocoding failed for '{city}': {e}")
+            return None
+    return None
 
 
 async def get_weather(city: str) -> dict:
     """Get current weather data using Open-Meteo API (free, no API key required)"""
 
+    # Return cached weather if fresh
+    cached = _get_weather_cached(city)
+    if cached:
+        return cached
+
     # Step 1: Geocode city name to lat/lon
     geo = await _geocode_city(city)
     if not geo:
-        return {"error": f"City '{city}' not found. Please check the city name and try again."}
+        return {"error": True, "msg": f"City '{city}' not found. Please check the city name and try again."}
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                FORECAST_URL,
+    for attempt in range(2):   # retry once on 429
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                response = await client.get(
+                    FORECAST_URL,
                 params={
                     "latitude": geo["latitude"],
                     "longitude": geo["longitude"],
@@ -160,8 +214,15 @@ async def get_weather(city: str) -> dict:
                 }
             )
 
-            if response.status_code != 200:
-                return {"error": f"Weather service returned status {response.status_code}. Please try again later."}
+                if response.status_code == 429:
+                    if attempt == 0:
+                        import asyncio
+                        await asyncio.sleep(1)
+                        continue
+                    return {"error": True, "msg": "Weather service is busy (rate limited). Please try again in a moment."}
+
+                if response.status_code != 200:
+                    return {"error": True, "msg": f"Weather service returned status {response.status_code}. Please try again later."}
 
             data = response.json()
             current = data.get("current", {})
@@ -211,12 +272,15 @@ async def get_weather(city: str) -> dict:
                 temp, humidity, wind_speed, wmo["description"], rain
             )
 
+            _set_weather_cache(city, weather_data)  # Cache for 5 min
             return weather_data
 
-    except httpx.TimeoutException:
-        return {"error": "Weather service request timed out. Please try again."}
-    except Exception as e:
-        return {"error": f"Failed to fetch weather data: {str(e)}"}
+        except httpx.TimeoutException:
+            return {"error": True, "msg": "Weather service request timed out. Please try again."}
+        except Exception as e:
+            return {"error": True, "msg": f"Failed to fetch weather data: {str(e)}"}
+
+    return {"error": True, "msg": "Weather service unavailable. Please try again later."}
 
 
 async def get_forecast(city: str) -> dict:
