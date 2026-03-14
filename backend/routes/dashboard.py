@@ -68,6 +68,29 @@ async def get_search_history(type: str = None, limit: int = 50, current_user: di
     return {"history": history}
 
 
+@router.delete("/search-history/{item_id}")
+async def delete_history_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    from bson import ObjectId
+    db = get_database()
+    if db is None:
+        return {"success": False}
+    result = await db.search_history.delete_one({
+        "_id": ObjectId(item_id),
+        "user_id": current_user["user_id"]
+    })
+    return {"success": result.deleted_count > 0}
+
+
+@router.delete("/search-history")
+async def clear_all_history(current_user: dict = Depends(get_current_user)):
+    db = get_database()
+    if db is None:
+        return {"success": False}
+    await db.search_history.delete_many({"user_id": current_user["user_id"]})
+    return {"success": True}
+
+
+
 @router.get("/analytics")
 async def get_analytics(current_user: dict = Depends(get_current_user)):
     db = get_database()
@@ -206,14 +229,12 @@ async def get_admin_recent_activity(current_user: dict = Depends(require_admin))
     if db is None:
         return {"activities": []}
     activities = []
-    # Recent user registrations
     async for doc in db.users.find({}, {"name": 1, "email": 1, "created_at": 1, "role": 1}).sort("created_at", -1).limit(3):
         activities.append({
             "icon": "👤",
             "text": f"New {doc.get('role', 'farmer')} registered: {doc.get('name', 'Unknown')}",
             "time": doc.get("created_at", "")
         })
-    # Recent predictions
     async for doc in db.predictions.find({}, {"prediction_type": 1, "created_at": 1}).sort("created_at", -1).limit(3):
         ptype = doc.get("prediction_type", "prediction")
         activities.append({
@@ -221,6 +242,98 @@ async def get_admin_recent_activity(current_user: dict = Depends(require_admin))
             "text": f"{'Disease detection' if ptype == 'disease' else 'Crop prediction'} performed",
             "time": doc.get("created_at", "")
         })
-    # Sort by time
     activities.sort(key=lambda x: x.get("time", ""), reverse=True)
     return {"activities": activities[:8]}
+
+
+# ─── Chatbot Logs (for admin monitoring) ───
+@router.get("/admin/chatbot-logs")
+async def get_chatbot_logs(limit: int = 100, current_user: dict = Depends(require_admin)):
+    db = get_database()
+    if db is None:
+        return {"logs": []}
+    cursor = db.chat_history.find({}).sort("created_at", -1).limit(limit)
+    logs = []
+    async for doc in cursor:
+        doc["_id"] = str(doc["_id"])
+        logs.append(doc)
+    return {"logs": logs}
+
+
+# ─── Delete User ───
+@router.delete("/admin/users/{user_id}")
+async def delete_user(user_id: str, current_user: dict = Depends(require_admin)):
+    from bson import ObjectId
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    try:
+        result = await db.users.delete_one({"_id": ObjectId(user_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        # Also clean up user data
+        await db.chat_history.delete_many({"user_id": user_id})
+        await db.predictions.delete_many({"user_id": user_id})
+        await db.search_history.delete_many({"user_id": user_id})
+        return {"message": "User and associated data deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── Toggle User Role ───
+@router.put("/admin/users/{user_id}/role")
+async def toggle_user_role(user_id: str, current_user: dict = Depends(require_admin)):
+    from bson import ObjectId
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    try:
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        new_role = "admin" if user.get("role") == "farmer" else "farmer"
+        await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"role": new_role}})
+        return {"message": f"Role changed to {new_role}", "new_role": new_role}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── Delete Feedback ───
+@router.delete("/admin/feedback/{feedback_id}")
+async def delete_feedback(feedback_id: str, current_user: dict = Depends(require_admin)):
+    from bson import ObjectId
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    try:
+        result = await db.feedback.delete_one({"_id": ObjectId(feedback_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Feedback not found")
+        return {"message": "Feedback deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ─── System Settings ───
+@router.get("/admin/settings")
+async def get_system_settings(current_user: dict = Depends(require_admin)):
+    db = get_database()
+    if db is None:
+        return {"settings": {}}
+    doc = await db.system_settings.find_one({"_id": "global"}) or {}
+    doc.pop("_id", None)
+    return {"settings": doc}
+
+
+@router.put("/admin/settings")
+async def update_system_settings(settings_data: dict, current_user: dict = Depends(require_admin)):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    settings_data["updated_at"] = datetime.utcnow().isoformat()
+    settings_data["updated_by"] = current_user["user_id"]
+    await db.system_settings.update_one(
+        {"_id": "global"}, {"$set": settings_data}, upsert=True
+    )
+    return {"message": "Settings updated successfully"}
+

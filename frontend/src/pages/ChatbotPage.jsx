@@ -14,19 +14,24 @@ export default function ChatbotPage() {
   const [voiceMode, setVoiceMode] = useState(false);
   const [speakingMsgIdx, setSpeakingMsgIdx] = useState(-1);
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
-  const [attachedFiles, setAttachedFiles] = useState([]); // for file attachments
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const utteranceRef = useRef(null);
+  const voiceModeRef = useRef(false);   // Tracks voiceMode for callbacks without stale closure
+  const isSendingRef = useRef(false);   // Prevents duplicate sends in voice mode
+  const isLoadingRef = useRef(false);   // Mirrors loading for recognition callbacks
+  const interruptRef = useRef(null);    // Interruption listener while AI is speaking
+  const speechCancelledRef = useRef(false); // Set true when we manually cancel TTS to stop speakNext chain
 
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(scrollToBottom, [messages]);
 
-  const langMap = { en: 'English', hi: 'हिन्दी', pa: 'ਪੰਜਾਬੀ', mr: 'मराठी', ta: 'தமிழ்', te: 'తెలుగు', bn: 'বাংলা' };
-  const speechLangMap = { en: 'en-IN', hi: 'hi-IN', pa: 'pa-IN', mr: 'mr-IN', ta: 'ta-IN', te: 'te-IN', bn: 'bn-IN' };
+  const langMap = { en: 'English', hi: 'हिन्दी', pa: 'ਪੰਜਾਬੀ', mr: 'मराठी', ta: 'தமிழ்', te: 'తెలుగు', bn: 'বাংলা', kn: 'ಕನ್ನಡ', gu: 'ગુજરાતી', ml: 'മലയാളം', or: 'ଓଡ଼ିଆ', as: 'অসমীয়া', ur: 'اردو' };
+  const speechLangMap = { en: 'en-IN', hi: 'hi-IN', pa: 'pa-IN', mr: 'mr-IN', ta: 'ta-IN', te: 'te-IN', bn: 'bn-IN', kn: 'kn-IN', gu: 'gu-IN', ml: 'ml-IN', or: 'or-IN', as: 'as-IN', ur: 'ur-IN' };
 
   // Load chat history on mount
   useEffect(() => {
@@ -56,6 +61,7 @@ export default function ChatbotPage() {
   // ─── Text-to-Speech ───
   const speakText = useCallback((text, msgIndex = -1) => {
     if (!('speechSynthesis' in window)) return;
+    speechCancelledRef.current = false;  // Reset cancel flag for new speech
     window.speechSynthesis.cancel();
 
     // Clean text for natural speech
@@ -63,24 +69,27 @@ export default function ChatbotPage() {
       .replace(/[*#_`~>]/g, '')
       .replace(/\n+/g, '. ')
       .replace(/- /g, '')
-      .replace(/\d+\./g, '') // Remove numbered list markers
+      .replace(/\d+\./g, '')
       .replace(/\s+/g, ' ')
       .trim()
       .substring(0, 2000);
 
     if (!cleanText) return;
 
-    // Split into sentences for more natural speech
     const sentences = cleanText.match(/[^.!?]+[.!?]+/g) || [cleanText];
     let currentIdx = 0;
 
     const speakNext = () => {
+      // If manually cancelled (stopSpeaking / interruption), do NOT chain to next sentence
+      if (speechCancelledRef.current) return;
+
       if (currentIdx >= sentences.length) {
         setIsSpeaking(false);
         setSpeakingMsgIdx(-1);
-        // In voice mode, auto-start listening after response
-        if (voiceMode) {
-          setTimeout(() => startListening(), 500);
+        if (interruptRef.current) { try { interruptRef.current.stop(); } catch {} interruptRef.current = null; }
+        // Auto-restart listening only when naturally finished (not cancelled)
+        if (voiceModeRef.current) {
+          setTimeout(() => startListening(true), 400);
         }
         return;
       }
@@ -91,10 +100,10 @@ export default function ChatbotPage() {
       utterance.pitch = 1.0;
       utterance.volume = 1;
 
-      // Find best matching voice
       const voices = window.speechSynthesis.getVoices();
       const langCode = utterance.lang.split('-')[0];
-      const matchingVoice = voices.find(v => v.lang.startsWith(langCode) && !v.localService) ||
+      const matchingVoice =
+        voices.find(v => v.lang.startsWith(langCode) && !v.localService) ||
         voices.find(v => v.lang.startsWith(langCode));
       if (matchingVoice) utterance.voice = matchingVoice;
 
@@ -104,13 +113,17 @@ export default function ChatbotPage() {
       };
 
       utterance.onend = () => {
+        // Only advance to next sentence if NOT manually cancelled
+        if (speechCancelledRef.current) return;
         currentIdx++;
         speakNext();
       };
 
       utterance.onerror = () => {
-        setIsSpeaking(false);
-        setSpeakingMsgIdx(-1);
+        if (!speechCancelledRef.current) {
+          setIsSpeaking(false);
+          setSpeakingMsgIdx(-1);
+        }
       };
 
       utteranceRef.current = utterance;
@@ -118,63 +131,130 @@ export default function ChatbotPage() {
     };
 
     speakNext();
+
+    // Background interruption mic — only in voice mode
+    if (voiceModeRef.current && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const iRecog = new SR();
+      iRecog.continuous = false;
+      iRecog.interimResults = true;
+      iRecog.maxAlternatives = 1;
+      let interruptFired = false;
+      iRecog.onresult = (event) => {
+        let txt = '';
+        for (let i = event.resultIndex; i < event.results.length; i++)
+          txt += event.results[i][0].transcript;
+        // Only trigger on meaningful speech (10+ chars = at least a short question)
+        if (txt.trim().length > 10 && !interruptFired && !isLoadingRef.current) {
+          interruptFired = true;
+          speechCancelledRef.current = true;  // Prevent speakNext chain
+          window.speechSynthesis.cancel();
+          setIsSpeaking(false); setSpeakingMsgIdx(-1);
+          if (interruptRef.current) { try { interruptRef.current.stop(); } catch {} interruptRef.current = null; }
+          // Process the interruption question
+          setTimeout(() => sendMessage(txt.trim()), 150);
+        }
+      };
+      iRecog.onerror = () => { interruptRef.current = null; };
+      iRecog.onend = () => { interruptRef.current = null; };
+      try { iRecog.start(); interruptRef.current = iRecog; } catch {}
+    }
   }, [language, voiceMode, voiceSpeed]);
 
+  // Keep refs in sync
+  useEffect(() => { voiceModeRef.current = voiceMode; }, [voiceMode]);
+  useEffect(() => { isLoadingRef.current = loading; }, [loading]);
+
   const stopSpeaking = useCallback(() => {
+    speechCancelledRef.current = true;   // Prevent utterance.onend from chaining
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
     setSpeakingMsgIdx(-1);
+    if (interruptRef.current) { try { interruptRef.current.stop(); } catch {} interruptRef.current = null; }
   }, []);
 
-  // ─── Speech Recognition ───
-  const startListening = useCallback(() => {
+  // ─── Speech Recognition — fixed to prevent duplicate sends & stop/pause keywords ───
+  const startListening = useCallback((forceVoiceMode = null) => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('Voice recognition is not supported in your browser. Please use Chrome.');
+      alert('Voice recognition not supported. Please use Chrome.');
       return;
     }
+    // Don't start a new recognition if one is already active
+    if (recognitionRef.current) return;
 
-    stopSpeaking(); // Stop any ongoing speech
+    stopSpeaking();
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = speechLangMap[language] || 'en-IN';
-    recognition.continuous = voiceMode; // continuous in voice mode
+    // Use forceVoiceMode (passed when toggling) OR the ref (stable value)
+    const inVoiceMode = forceVoiceMode !== null ? forceVoiceMode : voiceModeRef.current;
+    recognition.continuous = false;       // Always non-continuous — restart manually after each phrase
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => setIsListening(true);
+    let finalTranscript = '';
+    let hasSentThisSession = false;       // Guard: send only once per recognition session
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      finalTranscript = '';
+      hasSentThisSession = false;
+      isSendingRef.current = false;
+    };
 
     recognition.onresult = (event) => {
-      let transcript = '';
-      let isFinal = false;
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-        if (event.results[i].isFinal) isFinal = true;
+      let interim = '';
+      finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
       }
-      setInput(transcript);
+      // Show live interim in input box
+      setInput(finalTranscript || interim);
 
-      // In voice mode, auto-send when speech is final
-      if (voiceMode && isFinal && transcript.trim().length > 2) {
+      // Detect stop/pause keywords immediately
+      const combined = (finalTranscript || interim).toLowerCase().trim();
+      const stopKeywords = ['stop', 'ruko', 'bas', 'pause', 'quiet', 'chup', 'band karo'];
+      if (stopKeywords.some(kw => combined.includes(kw))) {
+        stopSpeaking();
+        setInput('');
+        return;
+      }
+
+      // Auto-send in voice mode only when final, not already sending, not loading
+      if (inVoiceMode && finalTranscript.trim().length > 2 && !hasSentThisSession && !isLoadingRef.current) {
+        hasSentThisSession = true;
+        isSendingRef.current = true;
         setTimeout(() => {
-          sendMessage(transcript.trim());
-        }, 300);
+          sendMessage(finalTranscript.trim());
+          isSendingRef.current = false;
+        }, 400);
       }
     };
 
     recognition.onend = () => {
       setIsListening(false);
       recognitionRef.current = null;
+      setInput('');
+      // In voice mode, auto-restart listening after speaking finishes
+      // (restart is handled by speakText's onend callback, not here)
     };
 
     recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
+      if (event.error !== 'aborted') {
+        console.error('Speech recognition error:', event.error);
+      }
       setIsListening(false);
       recognitionRef.current = null;
     };
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [language, voiceMode, stopSpeaking]);
+  }, [language, stopSpeaking]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -182,6 +262,7 @@ export default function ChatbotPage() {
       recognitionRef.current = null;
     }
     setIsListening(false);
+    setInput('');
   }, []);
 
   const toggleVoice = () => {
@@ -192,32 +273,116 @@ export default function ChatbotPage() {
     }
   };
 
-  // Toggle voice conversation mode (like ChatGPT voice)
+  // Toggle voice conversation mode — starts listening IMMEDIATELY
   const toggleVoiceMode = () => {
     if (voiceMode) {
+      // Exit voice mode
+      voiceModeRef.current = false;
       setVoiceMode(false);
       stopListening();
       stopSpeaking();
     } else {
+      // Enter voice mode — update ref FIRST so startListening sees the correct value
+      voiceModeRef.current = true;
       setVoiceMode(true);
       setAutoSpeak(true);
-      startListening();
+      // Pass forceVoiceMode=true so startListening doesn't use stale ref
+      setTimeout(() => startListening(true), 100);
     }
+  };
+
+  // ─── Simple Markdown Renderer ───
+  const renderMarkdown = (text) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    const elements = [];
+    let listItems = [];
+    let listKey = 0;
+
+    const flushList = () => {
+      if (listItems.length > 0) {
+        elements.push(
+          <ul key={`list-${listKey++}`} style={{ margin: '6px 0', paddingLeft: 20, listStyleType: 'disc' }}>
+            {listItems.map((li, j) => <li key={j} style={{ marginBottom: 3 }}>{formatInline(li)}</li>)}
+          </ul>
+        );
+        listItems = [];
+      }
+    };
+
+    const formatInline = (line) => {
+      // Bold + Italic, Bold, Italic
+      const parts = [];
+      const regex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*)/g;
+      let lastIndex = 0;
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        if (match.index > lastIndex) parts.push(line.slice(lastIndex, match.index));
+        if (match[2]) parts.push(<strong key={match.index}><em>{match[2]}</em></strong>);
+        else if (match[3]) parts.push(<strong key={match.index}>{match[3]}</strong>);
+        else if (match[4]) parts.push(<em key={match.index}>{match[4]}</em>);
+        lastIndex = regex.lastIndex;
+      }
+      if (lastIndex < line.length) parts.push(line.slice(lastIndex));
+      return parts.length > 0 ? parts : line;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // Heading
+      if (trimmed.startsWith('### ')) { flushList(); elements.push(<h4 key={i} style={{ fontSize: 14, fontWeight: 700, margin: '10px 0 4px', color: '#1b5a28' }}>{formatInline(trimmed.slice(4))}</h4>); }
+      else if (trimmed.startsWith('## ')) { flushList(); elements.push(<h3 key={i} style={{ fontSize: 15, fontWeight: 700, margin: '10px 0 4px', color: '#1b5a28' }}>{formatInline(trimmed.slice(3))}</h3>); }
+      else if (trimmed.startsWith('# ')) { flushList(); elements.push(<h3 key={i} style={{ fontSize: 16, fontWeight: 800, margin: '10px 0 4px', color: '#1b5a28' }}>{formatInline(trimmed.slice(2))}</h3>); }
+      // Bullet point
+      else if (/^[\-\*•]\s/.test(trimmed)) { listItems.push(trimmed.replace(/^[\-\*•]\s*/, '')); }
+      // Numbered list
+      else if (/^\d+[\.\)]\s/.test(trimmed)) { listItems.push(trimmed.replace(/^\d+[\.\)]\s*/, '')); }
+      // Empty line
+      else if (trimmed === '') { flushList(); elements.push(<div key={i} style={{ height: 6 }} />); }
+      // Normal paragraph
+      else { flushList(); elements.push(<p key={i} style={{ margin: '3px 0' }}>{formatInline(trimmed)}</p>); }
+    }
+    flushList();
+    return <div>{elements}</div>;
   };
 
   // ─── Send message ───
   const sendMessage = async (text) => {
-    const msg = text || input.trim();
-    if (!msg || loading) return;
+    const msg = (typeof text === 'string' ? text : '') || input.trim();
+    const currentFiles = [...attachedFiles];
+    if (!msg && currentFiles.length === 0) return;
+    if (loading) return;
 
     if (isListening && !voiceMode) stopListening();
 
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: msg, time: new Date().toISOString() }]);
+    setAttachedFiles([]);
+
+    // Build display message for user bubble — include image preview URL
+    let imagePreviewUrl = null;
+    const imageFile = currentFiles.find(f => f.type.startsWith('image/'));
+    if (imageFile) {
+      imagePreviewUrl = URL.createObjectURL(imageFile);
+    }
+    const displayContent = msg || (imageFile ? 'Analyze this image' : '');
+    setMessages(prev => [...prev, {
+      role: 'user',
+      content: displayContent,
+      imageUrl: imagePreviewUrl,
+      time: new Date().toISOString()
+    }]);
     setLoading(true);
 
     try {
-      const res = await chatAPI.sendMessage({ message: msg, language });
+      let res;
+      // If there are attached image files, send via the image endpoint
+      if (imageFile) {
+        res = await chatAPI.sendMessageWithImage(msg, language, imageFile);
+      } else {
+        res = await chatAPI.sendMessage({ message: msg || 'Analyze this for me', language });
+      }
       const data = res.data;
       const responseMsg = {
         role: 'assistant',
@@ -227,7 +392,6 @@ export default function ChatbotPage() {
       };
       setMessages(prev => {
         const newMsgs = [...prev, responseMsg];
-        // Auto-speak if enabled
         if (autoSpeak) {
           setTimeout(() => speakText(data.response, newMsgs.length - 1), 200);
         }
@@ -460,14 +624,23 @@ export default function ChatbotPage() {
               maxWidth: '70%', padding: '12px 16px', borderRadius: 14,
               background: m.role === 'user' ? 'var(--primary)' : '#f0faf0',
               color: m.role === 'user' ? 'white' : 'var(--text-primary)',
-              fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+              fontSize: 14, lineHeight: 1.6,
               borderBottomRightRadius: m.role === 'user' ? 4 : 14,
               borderBottomLeftRadius: m.role === 'user' ? 14 : 4,
               position: 'relative',
               boxShadow: speakingMsgIdx === i ? '0 0 0 2px #2d7a3a' : 'none',
               transition: 'box-shadow 0.3s'
             }}>
-              {m.content}
+              {/* Show uploaded image preview in user bubble */}
+              {m.imageUrl && (
+                <img src={m.imageUrl} alt="Uploaded"
+                  style={{
+                    maxWidth: 200, maxHeight: 200, borderRadius: 10,
+                    display: 'block', marginBottom: m.content ? 8 : 0,
+                    border: '2px solid rgba(255,255,255,0.3)'
+                  }} />
+              )}
+              {m.role === 'assistant' ? renderMarkdown(m.content) : m.content}
               {/* Speaker button on assistant messages */}
               {m.role === 'assistant' && m.content && !m.content.startsWith('Error') && (
                 <button
@@ -691,7 +864,7 @@ export default function ChatbotPage() {
 
           {/* Send button */}
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={loading || (!input.trim() && attachedFiles.length === 0)}
             title="Send message"
             style={{

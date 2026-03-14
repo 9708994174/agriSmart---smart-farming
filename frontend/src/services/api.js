@@ -41,6 +41,13 @@ export const authAPI = {
 
 export const chatAPI = {
   sendMessage: (data) => api.post('/chat/query', data),
+  sendMessageWithImage: (message, language, file) => {
+    const formData = new FormData();
+    formData.append('message', message || '');
+    formData.append('language', language || 'en');
+    formData.append('file', file);
+    return uploadApi.post('/chat/query-with-image', formData);
+  },
   getHistory: (limit = 50) => api.get(`/chat/history?limit=${limit}`),
   clearHistory: () => api.delete('/chat/history'),
 };
@@ -95,6 +102,8 @@ export const dashboardAPI = {
     params.append('limit', limit);
     return api.get(`/dashboard/search-history?${params.toString()}`);
   },
+  deleteHistoryItem: (id) => api.delete(`/dashboard/search-history/${id}`),
+  clearHistory: () => api.delete('/dashboard/search-history'),
   getAnalytics: () => api.get('/dashboard/analytics'),
   getAdminStats: () => api.get('/dashboard/admin/stats'),
   getAdminUsers: () => api.get('/dashboard/admin/users'),

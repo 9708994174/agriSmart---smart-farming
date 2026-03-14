@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
     # External APIs
-    OPENAI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""        # Groq AI (100% free tier)
     WEATHER_API_KEY: str = ""
     DATA_GOV_API_KEY: str = ""
 

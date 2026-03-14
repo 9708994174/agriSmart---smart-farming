@@ -1,64 +1,76 @@
-# Python
+# ─── Python ───
 __pycache__/
 *.py[cod]
 *.pyo
 *.egg-info/
-dist/
-build/
 *.egg
 .eggs/
 
-# Virtual Environment
+# ─── Virtual Environment ───
 venv/
 env/
 .venv/
+backend/venv/
 
-# Environment variables
+# ─── Environment Variables (NEVER commit these) ───
 .env
 .env.local
 .env.production
+.env.development
+frontend/.env
+backend/.env
 
-# Node
+# ─── Node ───
 node_modules/
 npm-debug.log*
+yarn-error.log
 
-# Build output
+# ─── Build Output ───
 frontend/dist/
 frontend/build/
+dist/
+build/
 
-# IDE
+# ─── IDE ───
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# ─── OS ───
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Uploads
+# ─── Uploads (runtime files, not code) ───
 backend/uploads/*
 !backend/uploads/.gitkeep
 
-# ML Models (large files)
+# ─── ML Models (large binary files) ───
 ml/crop_model/crop_model.pkl
 ml/crop_model/label_encoder.pkl
 ml/disease_model/disease_model.h5
+ml/disease_model/disease_model_yolo.pt
 ml/disease_model/dataset/
+*.pt
+*.h5
+*.pkl
+*.onnx
 
-# Logs
+# ─── Logs ───
 *.log
+logs/
 
-# Docker
+# ─── Docker ───
 docker-compose.override.yml
 
-# Testing
+# ─── Testing ───
 .coverage
 htmlcov/
 .pytest_cache/
 
-# Misc
+# ─── Misc ───
 *.bak
 *.tmp
+*.pyc

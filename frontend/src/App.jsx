@@ -26,8 +26,10 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Admin — own full-page layout, no farmer Layout wrapper */}
-          <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+          {/* Admin — uses the same Layout as farmer pages */}
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            <Route path="/admin" element={<AdminPage />} />
+          </Route>
 
           {/* Farmer Protected Routes */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

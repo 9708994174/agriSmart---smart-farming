@@ -1,14 +1,18 @@
 """
 Plant Disease Detection Service
 Uses YOLOv8 (Ultralytics) model for local on-device inference when model is available.
-Falls back to advanced multi-factor image analysis when model is not yet trained.
+Falls back to Groq AI (Llama 4 Scout Vision) for analysis when model is not trained.
 """
 import io
 import os
 import json
+import base64
 import traceback
 import numpy as np
 from PIL import Image
+from config import get_settings
+
+settings = get_settings()
 
 # ─── Model loading ───
 _model = None
@@ -59,7 +63,7 @@ def _get_model():
         except Exception as e:
             print(f"[ERROR] Failed to load model: {e}")
     else:
-        print(f"[WARN] Disease model not found at {MODEL_PATH}. Using advanced fallback analysis.")
+        print(f"[WARN] Disease model not found at {MODEL_PATH}. Using Groq AI fallback.")
 
     return None
 
@@ -119,12 +123,12 @@ def _format_class_name(raw_class: str) -> dict:
 async def detect_disease(image_bytes: bytes) -> dict:
     """
     Analyze plant leaf image for disease detection.
-    Uses local YOLOv8 model when available, otherwise uses advanced image analysis.
+    Uses local YOLOv8 model when available, otherwise uses Groq AI vision.
     """
     model = _get_model()
 
     if model is None:
-        return await _advanced_fallback_detection(image_bytes)
+        return await _groq_ai_detection(image_bytes)
 
     try:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -183,268 +187,188 @@ async def detect_disease(image_bytes: bytes) -> dict:
     except Exception as e:
         print(f"[ERROR] YOLOv8 inference failed: {e}")
         traceback.print_exc()
-        return await _advanced_fallback_detection(image_bytes)
+        return await _groq_ai_detection(image_bytes)
 
 
-async def _advanced_fallback_detection(image_bytes: bytes) -> dict:
+async def _groq_ai_detection(image_bytes: bytes) -> dict:
     """
-    Advanced multi-factor image analysis when the trained ML model is unavailable.
-    Analyzes: color distribution, spot patterns, texture variance, lesion detection.
-    Returns clinically-relevant results based on visual symptom patterns.
+    Use Groq AI (Llama 4 Scout Vision) for plant disease detection
+    when the local YOLOv8 model is not available.
+    """
+    if not settings.GROQ_API_KEY or not settings.GROQ_API_KEY.strip():
+        # If no API key, use the basic color analysis fallback
+        return _basic_fallback_detection(image_bytes)
+
+    try:
+        from groq import Groq
+
+        client = Groq(api_key=settings.GROQ_API_KEY)
+
+        # Resize image to reduce base64 payload size
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        image.thumbnail((512, 512), Image.LANCZOS)
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=80)
+        compressed_bytes = buffer.getvalue()
+
+        image_b64 = base64.b64encode(compressed_bytes).decode("utf-8")
+        image_url = f"data:image/jpeg;base64,{image_b64}"
+
+        analysis_prompt = """You are an expert plant pathologist specializing in Indian agriculture.
+Analyze this plant leaf image and respond STRICTLY in this JSON format ONLY (no markdown, no extra text):
+
+{
+  "disease_name": "Name of the disease or 'Healthy Plant'",
+  "confidence": 75,
+  "crop_type": "Name of the crop plant",
+  "description": "Detailed description of the disease, symptoms visible, and severity",
+  "treatment": ["Treatment step 1 with specific pesticide/fertilizer names and dosages", "Treatment step 2", "Treatment step 3"],
+  "pesticide": ["Specific pesticide name 1", "Specific pesticide name 2"],
+  "prevention": ["Prevention tip 1", "Prevention tip 2", "Prevention tip 3"]
+}
+
+IMPORTANT:
+- Use Indian brands/products when recommending pesticides (e.g., Dithane M-45, Ridomil Gold, Tilt, Kavach)
+- Include specific dosages (g/L or ml/L)
+- confidence should be a number between 50-90
+- If the plant looks healthy, set disease_name to "Healthy Plant" and confidence to 85+
+- Respond with ONLY the JSON object, nothing else"""
+
+        response = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": analysis_prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    ]
+                }
+            ],
+            max_tokens=800,
+            temperature=0.3,
+        )
+
+        ai_text = response.choices[0].message.content.strip()
+
+        # Parse AI JSON response
+        result = _parse_ai_response(ai_text)
+        result["analysis_method"] = "Groq AI Vision (Llama 4 Scout)"
+        return result
+
+    except Exception as e:
+        print(f"[ERROR] Groq AI disease detection failed: {e}")
+        traceback.print_exc()
+        # Final fallback: basic color analysis
+        return _basic_fallback_detection(image_bytes)
+
+
+def _parse_ai_response(ai_text: str) -> dict:
+    """Parse the AI response JSON, handling potential formatting issues."""
+    import re
+
+    # Try to extract JSON from the response
+    # Sometimes the model wraps it in markdown code blocks
+    json_match = re.search(r'\{[\s\S]*\}', ai_text)
+    if json_match:
+        try:
+            data = json.loads(json_match.group())
+            return {
+                "disease_name": data.get("disease_name", "Unknown Disease"),
+                "confidence": min(max(int(data.get("confidence", 65)), 0), 99),
+                "crop_type": data.get("crop_type", "Unknown"),
+                "description": data.get("description", "AI analysis completed."),
+                "treatment": data.get("treatment", []) if isinstance(data.get("treatment"), list) else [str(data.get("treatment", ""))],
+                "pesticide": data.get("pesticide", []) if isinstance(data.get("pesticide"), list) else [],
+                "prevention": data.get("prevention", []) if isinstance(data.get("prevention"), list) else [],
+                "alternatives": [],
+            }
+        except json.JSONDecodeError:
+            pass
+
+    # If JSON parsing fails, create a structured response from the text
+    return {
+        "disease_name": "AI Analysis Result",
+        "confidence": 60,
+        "crop_type": "Unknown",
+        "description": ai_text[:500],
+        "treatment": ["Please consult a local agricultural expert for specific treatment."],
+        "pesticide": [],
+        "prevention": ["Monitor crops regularly", "Maintain proper plant spacing"],
+        "alternatives": [],
+    }
+
+
+def _basic_fallback_detection(image_bytes: bytes) -> dict:
+    """
+    Basic color analysis fallback when neither the ML model nor AI API is available.
     """
     try:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-
-        # Resize for consistent analysis
         image_resized = image.resize((256, 256), Image.LANCZOS)
         img_array = np.array(image_resized).astype(np.float32)
 
-        r = img_array[:, :, 0]
-        g = img_array[:, :, 1]
-        b = img_array[:, :, 2]
-
-        # ─── Color ratio analysis ───
+        r, g, b = img_array[:, :, 0], img_array[:, :, 1], img_array[:, :, 2]
         total = r + g + b + 1e-6
         green_ratio = np.mean(g / total)
-        red_ratio = np.mean(r / total)
-        blue_ratio = np.mean(b / total)
-
-        avg_r = np.mean(r)
-        avg_g = np.mean(g)
-        avg_b = np.mean(b)
-
-        # ─── Yellow detection (early blight, TYLCV, rust) ───
-        # Yellow pixels: high R + high G, low B
+        brown_mask = (r > 120) & (g < 110) & (b < 90) & (r > g * 1.25)
+        brown_ratio = np.sum(brown_mask) / (256 * 256)
         yellow_mask = (r > 150) & (g > 130) & (b < 100) & (r > b * 1.8)
         yellow_ratio = np.sum(yellow_mask) / (256 * 256)
 
-        # ─── Brown/necrotic lesion detection (blight, leaf spot) ───
-        # Brown: R dominant, medium G, low B
-        brown_mask = (r > 120) & (g < 110) & (b < 90) & (r > g * 1.25)
-        brown_ratio = np.sum(brown_mask) / (256 * 256)
-
-        # ─── Dark spot detection (fungal diseases) ───
-        gray = 0.299 * r + 0.587 * g + 0.114 * b
-        dark_mask = gray < 60
-        dark_ratio = np.sum(dark_mask) / (256 * 256)
-
-        # ─── White powdery region detection (powdery mildew) ───
-        white_mask = (r > 200) & (g > 200) & (b > 200)
-        white_ratio = np.sum(white_mask) / (256 * 256)
-
-        # ─── Texture variance (healthy leaves are more uniform) ───
-        gray_img = image_resized.convert("L")
-        gray_arr = np.array(gray_img).astype(np.float32)
-        local_variance = np.var(gray_arr)
-        texture_score = min(local_variance / 1000.0, 1.0)
-
-        # ─── Green health index ───
-        # Chlorophyll index: (G - R) / (G + R + 1)
-        chl_idx = np.mean((g - r) / (g + r + 1.0))
-
-        # ─── Edge/spot density (lesions create sharp local edges) ───
-        # Simple gradient magnitude
-        grad_h = np.abs(np.diff(gray_arr, axis=0))
-        grad_v = np.abs(np.diff(gray_arr, axis=1))
-        edge_density = (np.mean(grad_h) + np.mean(grad_v)) / 2.0
-        edge_score = min(edge_density / 15.0, 1.0)
-
-        # ─── Decision logic ───
-        MODEL_NOTE = (
-            "⚠️ Note: The YOLOv8 ML model is not yet trained. "
-            "This result is based on advanced image analysis (color, texture, lesion patterns). "
-            "Train the model using the PlantVillage dataset for 95%+ accurate diagnosis."
+        NOTE = (
+            "This result is based on basic color analysis. "
+            "For accurate diagnosis, ensure your Groq API key is configured "
+            "or train the YOLOv8 model using the PlantVillage dataset."
         )
 
-        # POWDERY MILDEW: white powdery coating
-        if white_ratio > 0.15 and green_ratio < 0.38:
+        if brown_ratio > 0.15:
             return {
-                "disease_name": "Powdery Mildew (Suspected)",
-                "confidence": round(min(white_ratio * 250, 82), 1),
-                "crop_type": "Unknown (image analysis)",
-                "description": (
-                    "White powdery patches detected on leaf surface — consistent with powdery mildew caused by "
-                    "Erysiphales fungi. Affects many crops including wheat, tomato, squash, and cucurbits. " + MODEL_NOTE
-                ),
-                "treatment": [
-                    "Apply Wettable Sulphur (Sulfex) at 3g/L water — effective organic option",
-                    "Spray Karathane (Dinocap) 1ml/L for severe infections",
-                    "Use Trifloxystrobin + Tebuconazole systemic fungicide",
-                    "Remove and destroy heavily infected leaves immediately"
-                ],
-                "pesticide": ["Wettable Sulphur (Sulfex 80% WP)", "Dinocap (Karathane)", "Hexaconazole 5% EC"],
-                "prevention": [
-                    "Maintain adequate plant spacing for air circulation",
-                    "Avoid overhead irrigation — use drip systems",
-                    "Plant resistant varieties whenever available",
-                    "Apply preventive sulphur sprays during humid weather"
-                ],
-                "analysis_method": "Advanced Image Analysis (ML model not trained)",
-                "model_status": "pending_training"
+                "disease_name": "Leaf Blight / Spot (Suspected)",
+                "confidence": round(min(brown_ratio * 200, 70), 1),
+                "crop_type": "Unknown",
+                "description": f"Brown lesions detected on leaf. {NOTE}",
+                "treatment": ["Apply Mancozeb 75% WP (Dithane M-45) at 2.5g/L water"],
+                "pesticide": ["Mancozeb 75% WP"],
+                "prevention": ["Practice crop rotation", "Remove infected leaves"],
+                "analysis_method": "Basic Color Analysis (configure AI for better results)",
             }
-
-        # LATE BLIGHT: dark water-soaked lesions + high edge density
-        if brown_ratio > 0.20 and dark_ratio > 0.08 and edge_score > 0.5:
+        elif yellow_ratio > 0.15:
             return {
-                "disease_name": "Late Blight (Suspected)",
-                "confidence": round(min((brown_ratio + dark_ratio) * 180, 85), 1),
-                "crop_type": "Potato / Tomato (likely)",
-                "description": (
-                    "Dark water-soaked lesions with sharp necrotic borders detected — pattern consistent with "
-                    "Late Blight caused by Phytophthora infestans. This is a highly destructive disease that "
-                    "spreads rapidly in cool, wet conditions. " + MODEL_NOTE
-                ),
-                "treatment": [
-                    "Apply Metalaxyl + Mancozeb (Ridomil Gold MZ) 2.5g/L immediately",
-                    "Spray Cymoxanil + Mancozeb (Curzate) on affected areas",
-                    "Destroy severely infected plants to stop further spread",
-                    "Do not compost infected material"
-                ],
-                "pesticide": ["Metalaxyl + Mancozeb (Ridomil Gold MZ)", "Cymoxanil + Mancozeb (Curzate)", "Dimethomorph + Mancozeb"],
-                "prevention": [
-                    "Use certified blight-resistant varieties (Kufri Jyoti, Arka Rakshak)",
-                    "Avoid overhead irrigation — keep foliage dry",
-                    "Monitor daily during cool & wet weather (below 20°C + rain)",
-                    "Apply preventive copper spray before monsoon season"
-                ],
-                "analysis_method": "Advanced Image Analysis (ML model not trained)",
-                "model_status": "pending_training"
+                "disease_name": "Chlorosis / Nutrient Deficiency (Suspected)",
+                "confidence": round(min(yellow_ratio * 200, 65), 1),
+                "crop_type": "Unknown",
+                "description": f"Yellowing detected on leaf. {NOTE}",
+                "treatment": ["Check soil pH", "Apply micronutrient spray"],
+                "pesticide": [],
+                "prevention": ["Regular soil testing", "Balanced fertilization"],
+                "analysis_method": "Basic Color Analysis (configure AI for better results)",
             }
-
-        # EARLY BLIGHT / LEAF SPOT: brown concentric rings, moderate edge density
-        if brown_ratio > 0.12 and edge_score > 0.35 and yellow_ratio < 0.10:
-            return {
-                "disease_name": "Early Blight / Leaf Spot (Suspected)",
-                "confidence": round(min(brown_ratio * 220 + edge_score * 30, 80), 1),
-                "crop_type": "Tomato / Potato (likely)",
-                "description": (
-                    "Brown lesions with defined borders detected — pattern consistent with Early Blight "
-                    "(Alternaria solani) or related fungal leaf spot diseases. Typically appears on older, "
-                    "lower leaves first and progresses upward. " + MODEL_NOTE
-                ),
-                "treatment": [
-                    "Apply Mancozeb 75% WP (Dithane M-45) at 2.5g/L water",
-                    "Spray Chlorothalonil (Kavach) 2g/L every 7-10 days",
-                    "Remove infected lower leaves from the plant",
-                    "Apply Azoxystrobin (Amistar) for severe infections"
-                ],
-                "pesticide": ["Mancozeb 75% WP (Dithane M-45)", "Chlorothalonil (Kavach)", "Azoxystrobin (Amistar)"],
-                "prevention": [
-                    "Stake tomato plants and maintain 60×45cm spacing",
-                    "Use mulch to prevent soil splash onto leaves",
-                    "Apply balanced NPK — avoid excess nitrogen",
-                    "Practice 2-3 year crop rotation with non-solanaceous crops"
-                ],
-                "analysis_method": "Advanced Image Analysis (ML model not trained)",
-                "model_status": "pending_training"
-            }
-
-        # YELLOWING / VIRAL DISEASE: prominent yellow regions
-        if yellow_ratio > 0.20:
-            return {
-                "disease_name": "Chlorosis / Viral Disease (Suspected)",
-                "confidence": round(min(yellow_ratio * 200, 78), 1),
-                "crop_type": "Unknown (image analysis)",
-                "description": (
-                    "Significant yellowing (chlorosis) detected across leaf surface — may indicate "
-                    "nutrient deficiency (iron, nitrogen, magnesium), or viral infections such as "
-                    "Tomato Yellow Leaf Curl Virus (TYLCV) or mosaic viruses spread by whiteflies/aphids. " + MODEL_NOTE
-                ),
-                "treatment": [
-                    "Check soil pH (ideal 6.0–7.0) and apply micronutrients if deficient",
-                    "Apply Ferrous Sulphate (FeSO₄) 0.5% spray for iron deficiency",
-                    "Control vector insects: spray Imidacloprid (Confidor) 0.5ml/L for whiteflies",
-                    "Remove and destroy virus-infected plants to prevent spread"
-                ],
-                "pesticide": ["Imidacloprid (Confidor) for vector control", "Ferrous Sulphate 0.5% for iron deficiency"],
-                "prevention": [
-                    "Use TYLCV/virus-resistant varieties (Arka Ananya, TH-1)",
-                    "Monitor whitefly/aphid populations with yellow sticky traps",
-                    "Maintain balanced soil nutrition with regular soil testing",
-                    "Remove weeds that harbour virus vectors"
-                ],
-                "analysis_method": "Advanced Image Analysis (ML model not trained)",
-                "model_status": "pending_training"
-            }
-
-        # RUST DISEASE: rust-colored pustules (reddish-orange with edge spores)
-        if red_ratio > 0.36 and texture_score > 0.4 and green_ratio < 0.35:
-            return {
-                "disease_name": "Rust Disease (Suspected)",
-                "confidence": round(min(red_ratio * 160 + texture_score * 40, 76), 1),
-                "crop_type": "Wheat / Corn / Legume (likely)",
-                "description": (
-                    "Reddish-orange coloration with high surface texture detected — consistent with rust "
-                    "diseases caused by Puccinia species. Small pustules rupture to release powdery rust-colored "
-                    "spores on leaf surfaces. Common in wheat, corn, soybean, and beans. " + MODEL_NOTE
-                ),
-                "treatment": [
-                    "Apply Propiconazole (Tilt 25% EC) at 1ml/L — most effective rust fungicide",
-                    "Spray Mancozeb 75% WP at 2.5g/L as protective cover",
-                    "Apply Tebuconazole for systemic control in severe cases",
-                    "Spray at first pustule appearance for best results"
-                ],
-                "pesticide": ["Propiconazole (Tilt 25% EC)", "Mancozeb 75% WP", "Tebuconazole 250 EC"],
-                "prevention": [
-                    "Plant rust-resistant crop varieties",
-                    "Early sowing to avoid peak rust season",
-                    "Monitor regularly during warm humid weather",
-                    "Avoid dense planting — ensure air circulation"
-                ],
-                "analysis_method": "Advanced Image Analysis (ML model not trained)",
-                "model_status": "pending_training"
-            }
-
-        # HEALTHY: good green, normal texture, no disease indicators
-        if green_ratio > 0.38 and chl_idx > 0.05 and brown_ratio < 0.08 and yellow_ratio < 0.10:
-            confidence = round(min(green_ratio * 140 + chl_idx * 60, 90), 1)
+        elif green_ratio > 0.38:
             return {
                 "disease_name": "Healthy Plant",
-                "confidence": confidence,
-                "crop_type": "Unknown (image analysis)",
-                "description": (
-                    "The leaf appears healthy — good green coloration, normal chlorophyll index, and no visible "
-                    "lesions or discoloration patterns detected. Continue regular care and monitoring. " + MODEL_NOTE
-                ),
+                "confidence": round(min(green_ratio * 140, 80), 1),
+                "crop_type": "Unknown",
+                "description": f"Plant appears healthy. {NOTE}",
                 "treatment": ["No treatment needed — plant appears healthy!"],
                 "pesticide": [],
-                "prevention": [
-                    "Continue regular watering and fertilization schedule",
-                    "Monitor regularly for early signs of disease",
-                    "Maintain proper plant spacing for air circulation",
-                    "Practice crop rotation to prevent soil-borne diseases"
-                ],
-                "analysis_method": "Advanced Image Analysis (ML model not trained)",
-                "model_status": "pending_training"
+                "prevention": ["Continue regular care and monitoring"],
+                "analysis_method": "Basic Color Analysis (configure AI for better results)",
+            }
+        else:
+            return {
+                "disease_name": "Analysis Inconclusive",
+                "confidence": 25,
+                "crop_type": "Unknown",
+                "description": f"Unable to determine disease from image. {NOTE}",
+                "treatment": ["Upload a clearer photo of the affected leaf in natural light"],
+                "pesticide": [],
+                "prevention": ["Take close-up photos in good lighting"],
+                "analysis_method": "Basic Color Analysis (configure AI for better results)",
             }
 
-        # INCONCLUSIVE: mixed signals
-        dominant = "yellow-brown" if (yellow_ratio + brown_ratio) > 0.15 else "unclear"
-        return {
-            "disease_name": "Analysis Inconclusive — Upload Clearer Image",
-            "confidence": 25,
-            "crop_type": "Unknown",
-            "description": (
-                f"Image analysis returned mixed signals (dominant color: {dominant}). "
-                "For accurate results, please upload a clear, close-up photo of a plant leaf in good lighting. " + MODEL_NOTE
-            ),
-            "treatment": [
-                "Upload a close-up photo of the affected leaf in natural daylight",
-                "Ensure the leaf fills most of the frame",
-                "Avoid harsh shadows or reflections"
-            ],
-            "pesticide": [],
-            "prevention": [
-                "Take photos in natural daylight for best accuracy",
-                "Include both healthy and affected portions of the leaf",
-                "Use a plain background if possible"
-            ],
-            "analysis_method": "Advanced Image Analysis (ML model not trained)",
-            "model_status": "pending_training"
-        }
-
     except Exception as e:
-        print(f"[ERROR] Advanced fallback detection failed: {e}")
+        print(f"[ERROR] Basic fallback detection failed: {e}")
         traceback.print_exc()
         return {
             "disease_name": "Analysis Error",

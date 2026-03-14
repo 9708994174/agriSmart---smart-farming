@@ -79,7 +79,9 @@ export default function DashboardPage() {
     },
   ];
 
-  const typeLabels = { chat: 'Chat', crop_prediction: 'Crop', disease_detection: 'Disease', weather: 'Weather', market: 'Market' };
+  const typeIcons  = { chat: '💬', crop_prediction: '🌾', disease_detection: '🔬', weather: '🌤️', market: '📊' };
+  const typeColors  = { chat: '#2d7a3a', crop_prediction: '#4caf50', disease_detection: '#f5a623', weather: '#1e88e5', market: '#e53935' };
+  const typeLabels  = { chat: 'Chat', crop_prediction: 'Crop', disease_detection: 'Disease', weather: 'Weather', market: 'Market' };
 
   if (loading) {
     return <div className="flex-center" style={{ height: '60vh' }}><div className="spinner" /></div>;
@@ -220,35 +222,45 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Activity */}
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: '#1a2e1a' }}>Recent Activity</h3>
+      <h3 style={{ fontSize: 17, fontWeight: 800, marginBottom: 12, color: '#1a2e1a' }}>📋 Recent Activity</h3>
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {activities.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-            No recent activity. Start exploring the features above to see your history here.
+          <div style={{ padding: 40, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+            <p style={{ fontSize: 28, marginBottom: 8 }}>📭</p>
+            No recent activity. Start exploring the features above!
           </div>
         ) : (
-          activities.map((act, i) => (
-            <div key={i} style={{
-              padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14,
-              borderBottom: i < activities.length - 1 ? '1px solid var(--border-light)' : 'none'
-            }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0
-              }} />
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13, fontWeight: 500, color: '#1a2e1a' }}>{act.query?.substring(0, 80)}</p>
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {new Date(act.timestamp).toLocaleString()}
-                </p>
+          activities.map((act, i) => {
+            const accent = typeColors[act.type] || ['#2d7a3a','#1565c0','#7b1fa2','#e65100','#e53935'][i % 5];
+            const emoji  = typeIcons[act.type] || '📋';
+            return (
+              <div key={i} style={{
+                padding: '13px 20px', display: 'flex', alignItems: 'center', gap: 14,
+                borderBottom: i < activities.length - 1 ? '1px solid var(--border-light)' : 'none',
+                borderLeft: `3px solid ${accent}`, transition: 'background 0.15s',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, background: `${accent}14`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18, flexShrink: 0,
+                }}>{emoji}</div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: '#1a2e1a', margin: 0 }}>{act.query?.substring(0, 80)}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {new Date(act.timestamp).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <span style={{
+                  padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                  background: `${accent}12`, color: accent,
+                }}>
+                  {typeLabels[act.type] || 'Activity'}
+                </span>
               </div>
-              <span style={{
-                padding: '3px 10px', borderRadius: 6, fontSize: 11,
-                background: '#f0f5f0', color: '#2d5a2d', fontWeight: 500
-              }}>
-                {typeLabels[act.type] || 'Activity'}
-              </span>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
