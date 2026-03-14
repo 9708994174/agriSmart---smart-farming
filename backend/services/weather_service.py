@@ -10,18 +10,22 @@ from typing import Optional
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL  = "https://api.open-meteo.com/v1/forecast"
 
-# ── In-memory weather cache (5-min TTL) — prevents repeated API hits ──────────
-_weather_cache: dict = {}
-_WEATHER_TTL = 300   # 5 minutes
+# ── Production-grade per-city cache (30-min TTL) ─────────────────────────────
+# Technique 1+3: All users share the same cached result per city.
+# Even with 10,000 users, Open-Meteo is called at most once per 30 min per city.
+_weather_cache: dict = {}   # key: city.lower() → (data, timestamp)
+_forecast_cache: dict = {}  # key: city.lower() → (data, timestamp)
+_WEATHER_TTL  = 1800  # 30 minutes (was 5 min — increased for production)
+_FORECAST_TTL = 1800  # 30 minutes for forecast too
 
-def _get_weather_cached(city: str) -> Optional[dict]:
-    entry = _weather_cache.get(city.lower())
-    if entry and (time.time() - entry[1]) < _WEATHER_TTL:
+def _get_cache(store: dict, city: str, ttl: int):
+    entry = store.get(city.lower())
+    if entry and (time.time() - entry[1]) < ttl:
         return entry[0]
     return None
 
-def _set_weather_cache(city: str, data: dict):
-    _weather_cache[city.lower()] = (data, time.time())
+def _set_cache(store: dict, city: str, data: dict):
+    store[city.lower()] = (data, time.time())
 
 
 # ── Built-in coordinates for 80+ major Indian cities ──────────────────────────
@@ -163,51 +167,191 @@ WMO_CODES = {
 
 
 def _get_wmo_info(code: int) -> dict:
-    """Get weather description and icon from WMO code"""
     return WMO_CODES.get(code, {"description": "Unknown", "icon": "🌡️"})
 
 
-def generate_farming_advice(temp: float, humidity: float, wind: float, description: str, rain: float = 0) -> list:
-    """Generate farming-specific weather advice"""
-    advice = []
+def generate_farming_advice(temp: float, humidity: float, wind: float,
+                            description: str, rain: float = 0,
+                            uv: float = 0, precip_prob: float = 0) -> dict:
+    """Generate comprehensive farmer-specific advisory with activity scores."""
+    tips  = []
+    warns = []
     desc_lower = description.lower() if description else ""
 
-    if rain > 5:
-        advice.append("Significant rainfall expected. Avoid spraying pesticides or fertilizers today.")
-        advice.append("Ensure proper drainage in fields to prevent waterlogging.")
+    # ── Rain & moisture ───────────────────────────────────────────────────────
+    if rain > 10:
+        warns.append("🚨 Heavy rain today — avoid all field operations. Check drainage channels.")
+        warns.append("🌊 Risk of soil erosion and crop lodging. Stake tall crops immediately.")
+    elif rain > 3:
+        tips.append("🌧️ Moderate rain expected — skip irrigation today, nature does the job!")
+        tips.append("🚫 Do NOT spray pesticides or fertilisers — rain will wash them away.")
     elif rain > 0:
-        advice.append("Light rain expected. Good conditions for transplanting seedlings.")
+        tips.append("🌦️ Light drizzle expected. Good for transplanting seedlings.")
+    else:
+        if precip_prob < 20:
+            tips.append("💧 No rain expected. Check soil moisture and irrigate if needed.")
 
-    if temp > 35:
-        advice.append("High temperature alert. Irrigate crops during early morning or late evening to reduce evaporation.")
-        advice.append("Consider mulching to retain soil moisture in this heat.")
-    elif temp < 10:
-        advice.append("Low temperature advisory. Protect sensitive crops and nurseries from frost damage.")
-        advice.append("Avoid irrigation during night to prevent frost formation on leaves.")
+    # ── Temperature ───────────────────────────────────────────────────────────
+    if temp > 42:
+        warns.append("🔥 Extreme heat (>42°C). Crops under severe heat stress — irrigate twice today.")
+        warns.append("🌿 Apply mulch immediately to protect root zone from heat.")
+    elif temp > 35:
+        warns.append("☀️ High heat alert. Irrigate early morning (5–7 AM) or after sunset.")
+        tips.append("🌾 Avoid transplanting seedlings — wait for cooler evening hours.")
+    elif temp < 5:
+        warns.append("❄️ Near-freezing temperatures. Cover frost-sensitive crops with nets tonight.")
+        warns.append("🚫 Avoid overhead irrigation — wet leaves may freeze and burn.")
+    elif temp < 15:
+        tips.append("🥶 Cool weather — ideal for Rabi crops (wheat, mustard, chickpea).")
+        tips.append("🌙 Avoid night irrigation to prevent cold stress on roots.")
     elif 20 <= temp <= 30:
-        advice.append("Temperature is optimal for most crop growth activities.")
+        tips.append("✅ Optimal temperature range — ideal for most crop activities.")
+    elif 30 < temp <= 35:
+        tips.append("🌤️ Warm conditions. Irrigate in the evening for best water absorption.")
 
-    if humidity > 85:
-        advice.append("High humidity increases risk of fungal diseases. Monitor crops for signs of infection.")
-    elif humidity < 30:
-        advice.append("Low humidity levels. Increase irrigation frequency and consider sprinkler systems.")
+    # ── Humidity ──────────────────────────────────────────────────────────────
+    if humidity > 90:
+        warns.append("⚠️ Very high humidity (>90%) — high risk of fungal blight & mildew. Inspect crops.")
+        warns.append("🍄 Spray preventive fungicide if conditions persist more than 2 days.")
+    elif humidity > 75:
+        tips.append("💧 Elevated humidity — monitor for early signs of fungal disease on leaves.")
+    elif humidity < 25:
+        warns.append("🏜️ Very dry air (<25% humidity). Increase irrigation frequency significantly.")
+    elif humidity < 40:
+        tips.append("☀️ Low humidity — mulch fields to reduce water evaporation from soil.")
 
-    if wind > 25:
-        advice.append("Strong winds expected. Secure any temporary structures and staked plants.")
+    # ── Wind ──────────────────────────────────────────────────────────────────
+    if wind > 40:
+        warns.append("🌪️ Strong winds (>40 km/h) — DO NOT spray pesticides. Risk of drift injury.")
+        warns.append("🪴 Secure all young plants, stakes, and greenhouse structures immediately.")
+    elif wind > 20:
+        tips.append("💨 Moderate wind — postpone chemical spraying to calm hours (early morning).")
+    elif wind < 8 and humidity > 70:
+        tips.append("🌿 Calm & humid — ideal window for pesticide/fungicide application.")
 
-    if "clear" in desc_lower or "sun" in desc_lower:
-        advice.append("Clear skies today. Good conditions for harvesting, drying, and field preparation.")
+    # ── UV Index ─────────────────────────────────────────────────────────────
+    if uv >= 8:
+        warns.append("☀️ Very high UV today. Field workers must wear full protection (hat, sleeves, sunscreen).")
+    elif uv >= 5:
+        tips.append("🧢 High UV between 10 AM–4 PM. Schedule heavy field work for early morning.")
 
+    # ── Condition-specific ────────────────────────────────────────────────────
     if "thunderstorm" in desc_lower:
-        advice.append("⚡ Thunderstorm expected. Avoid outdoor field work and stay safe.")
-
+        warns.append("⚡ Thunderstorm — stop all field operations immediately. Seek shelter.")
     if "fog" in desc_lower:
-        advice.append("Foggy conditions. Delay pesticide spray as it can drift. Ideal for some vegetable growth.")
+        tips.append("🌫️ Foggy morning — delay pesticide application until fog clears (mid-morning).")
+        tips.append("🌱 Fog provides moisture — reduce irrigation for the day.")
+    if "clear" in desc_lower or "sunny" in desc_lower:
+        tips.append("☀️ Clear sky — excellent for harvesting, threshing, and drying produce.")
 
-    if not advice:
-        advice.append("Weather conditions are moderate. Suitable for regular farming activities.")
+    # ── Field Activity Score (0-100, higher = better for field work) ──────────
+    score = 70  # baseline
+    if rain > 5:   score -= 40
+    elif rain > 0: score -= 15
+    if wind > 40:  score -= 30
+    elif wind > 20: score -= 10
+    if temp > 40 or temp < 5:  score -= 25
+    elif temp > 35 or temp < 10: score -= 10
+    if humidity > 90: score -= 15
+    if "thunderstorm" in desc_lower: score -= 50
+    score = max(0, min(100, score))
 
-    return advice
+    if score >= 75: activity_label, activity_color = "Excellent", "#16a34a"
+    elif score >= 55: activity_label, activity_color = "Good",      "#2d7a3a"
+    elif score >= 35: activity_label, activity_color = "Fair",       "#d97706"
+    else:             activity_label, activity_color = "Poor",       "#dc2626"
+
+    # ── Irrigation score ──────────────────────────────────────────────────────
+    irrig_needed = max(0, min(100, 80 - (rain * 12) - (humidity * 0.3) - (precip_prob * 0.4)))
+    if   irrig_needed >= 70: irrig_label = "High"
+    elif irrig_needed >= 40: irrig_label = "Moderate"
+    elif irrig_needed >= 20: irrig_label = "Low"
+    else:                    irrig_label = "None needed"
+
+    # ── Spray suitability ─────────────────────────────────────────────────────
+    spray_ok = (wind < 15 and rain == 0 and precip_prob < 30 and humidity < 80)
+    spray_label = "✅ Good window" if spray_ok else "❌ Not suitable"
+
+    if not tips and not warns:
+        tips.append("🌾 Conditions are moderate. Continue regular farming activities.")
+
+    return {
+        "tips"            : tips,
+        "warnings"        : warns,
+        "field_score"     : score,
+        "field_label"     : activity_label,
+        "field_color"     : activity_color,
+        "irrigation_score": round(irrig_needed),
+        "irrigation_label": irrig_label,
+        "spray_suitable"  : spray_ok,
+        "spray_label"     : spray_label,
+    }
+
+
+async def _fetch_with_backoff(url: str, params: dict, max_retries: int = 3) -> Optional[dict]:
+    """Technique 4: Exponential backoff retry — 2s → 4s → 8s"""
+    import asyncio
+    delay = 2
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(url, params=params)
+                if resp.status_code == 200:
+                    return resp.json()
+                if resp.status_code == 429:
+                    print(f"[WARN] Rate limited (429). Retry {attempt+1}/{max_retries} after {delay}s")
+                    await asyncio.sleep(delay)
+                    delay *= 2   # exponential backoff
+                    continue
+                # Other error — don't retry
+                print(f"[WARN] HTTP {resp.status_code} from {url}")
+                return None
+        except (httpx.TimeoutException, httpx.ConnectError) as e:
+            print(f"[WARN] Request failed (attempt {attempt+1}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(delay)
+                delay *= 2
+    return None
+
+
+async def _fallback_wttr(city: str) -> Optional[dict]:
+    """Technique 6: Fallback to wttr.in if Open-Meteo is completely unavailable."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"https://wttr.in/{city}",
+                params={"format": "j1"},
+                headers={"User-Agent": "AgriSmart-Weather/1.0"}
+            )
+            if resp.status_code != 200:
+                return None
+            d     = resp.json()
+            cur   = d["current_condition"][0]
+            area  = d["nearest_area"][0]
+            cname = area["areaName"][0]["value"]
+            state = area.get("region", [{}])[0].get("value", "")
+            temp  = float(cur["temp_C"])
+            hum   = int(cur["humidity"])
+            wind  = float(cur["windspeedKmph"])
+            desc  = cur["weatherDesc"][0]["value"]
+            adv   = generate_farming_advice(temp, hum, wind, desc)
+            return {
+                "city"           : cname,
+                "country"        : "IN",
+                "state"          : state,
+                "temperature"    : temp,
+                "feels_like"     : float(cur["FeelsLikeC"]),
+                "humidity"       : hum,
+                "wind_speed"     : wind,
+                "description"    : desc,
+                "icon"           : "🌡️",
+                "farming_advisory": adv,
+                "data_source"    : "wttr.in (fallback)",
+            }
+    except Exception as e:
+        print(f"[ERROR] wttr.in fallback failed: {e}")
+        return None
+
 
 
 
@@ -261,182 +405,186 @@ async def _geocode_city(city: str) -> Optional[dict]:
 
 
 async def get_weather(city: str) -> dict:
-    """Get current weather data using Open-Meteo API (free, no API key required)"""
+    """Get current weather — Technique 1+2+3: Per-city 30-min server-side cache."""
 
-    # Return cached weather if fresh (prevents repeated hits)
-    cached = _get_weather_cached(city)
+    # Check 30-min cache first (all users share this)
+    cached = _get_cache(_weather_cache, city, _WEATHER_TTL)
     if cached:
         return cached
 
-    # Resolve city → lat/lon (built-in dict first, then geocoding API fallback)
+    # Resolve city → lat/lon (built-in dict first → zero geocoding API calls)
     geo = _lookup_city(city) or await _geocode_city(city)
     if not geo:
-        return {"error": True, "msg": f"City '{city}' not found. Try a nearby major city."}
+        return {"error": True, "msg": f"City '{city}' not found. Try a nearby major city name."}
 
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(
-                FORECAST_URL,
-                params={
-                    "latitude": geo["latitude"],
-                    "longitude": geo["longitude"],
-                    "current": "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
-                    "hourly": "temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,weather_code,visibility,wind_speed_10m",
-                    "daily": "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,precipitation_sum,rain_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max",
-                    "timezone": geo.get("timezone", "auto"),
-                    "forecast_days": 7,
-                }
-            )
+    params = {
+        "latitude"    : geo["latitude"],
+        "longitude"   : geo["longitude"],
+        "current"     : "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
+        "daily"       : "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,rain_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max",
+        "timezone"    : geo.get("timezone", "auto"),
+        "forecast_days": 1,
+    }
 
-            if response.status_code == 429:
-                return {"error": True, "msg": "Weather service is busy (rate limited). Please wait a moment and try again."}
+    # Technique 4: exponential backoff retry (2s → 4s → 8s)
+    data = await _fetch_with_backoff(FORECAST_URL, params)
 
-            if response.status_code != 200:
-                return {"error": True, "msg": f"Weather service returned status {response.status_code}. Please try again later."}
+    # Technique 6: fallback to wttr.in if Open-Meteo fails completely
+    if data is None:
+        fallback = await _fallback_wttr(city)
+        if fallback:
+            _set_cache(_weather_cache, city, fallback)
+            return fallback
+        return {"error": True, "msg": "Weather service unavailable. Please try again in a few minutes."}
 
-            data    = response.json()
-            current = data.get("current", {})
-            daily   = data.get("daily", {})
+    current = data.get("current", {})
+    daily   = data.get("daily", {})
+    wmo     = _get_wmo_info(current.get("weather_code", 0))
 
-            weather_code = current.get("weather_code", 0)
-            wmo          = _get_wmo_info(weather_code)
+    temp        = round(current.get("temperature_2m", 0), 1)
+    humidity    = current.get("relative_humidity_2m", 0)
+    wind_speed  = round(current.get("wind_speed_10m", 0), 1)
+    rain        = current.get("rain", 0) or 0
+    uv_index    = (daily.get("uv_index_max") or [0])[0]
+    precip_prob = (daily.get("precipitation_probability_max") or [0])[0]
 
-            temp       = round(current.get("temperature_2m", 0), 1)
-            humidity   = current.get("relative_humidity_2m", 0)
-            wind_speed = round(current.get("wind_speed_10m", 0), 1)
-            rain       = current.get("rain", 0) or 0
+    weather_data = {
+        "city"         : geo["name"],
+        "country"      : geo.get("country_code", ""),
+        "state"        : geo.get("admin1", ""),
+        "latitude"     : geo["latitude"],
+        "longitude"    : geo["longitude"],
+        "temperature"  : temp,
+        "feels_like"   : round(current.get("apparent_temperature", temp), 1),
+        "temp_min"     : round((daily.get("temperature_2m_min") or [temp])[0], 1),
+        "temp_max"     : round((daily.get("temperature_2m_max") or [temp])[0], 1),
+        "humidity"     : humidity,
+        "pressure"     : round(current.get("pressure_msl", 1013)),
+        "description"  : wmo["description"],
+        "icon"         : wmo["icon"],
+        "weather_code" : current.get("weather_code", 0),
+        "is_day"       : current.get("is_day", 1),
+        "wind_speed"   : wind_speed,
+        "wind_direction": current.get("wind_direction_10m", 0),
+        "wind_gusts"   : round(current.get("wind_gusts_10m", 0), 1),
+        "clouds"       : current.get("cloud_cover", 0),
+        "rain"         : rain,
+        "precipitation": current.get("precipitation", 0),
+        "sunrise"      : (daily.get("sunrise") or [""])[0],
+        "sunset"       : (daily.get("sunset")  or [""])[0],
+        "uv_index"     : uv_index,
+        "precip_prob"  : precip_prob,
+        "data_source"  : "Open-Meteo (free, no API key)",
+        "cached_at"    : int(time.time()),
+    }
 
-            temp_min = round(daily.get("temperature_2m_min", [0])[0], 1)
-            temp_max = round(daily.get("temperature_2m_max", [0])[0], 1)
+    # Rich farmer advisory with scores
+    weather_data["farming_advisory"] = generate_farming_advice(
+        temp, humidity, wind_speed, wmo["description"], rain, uv_index, precip_prob
+    )
+    # Legacy field for backward compatibility
+    weather_data["farming_advice"] = (
+        weather_data["farming_advisory"]["warnings"] +
+        weather_data["farming_advisory"]["tips"]
+    )
 
-            weather_data = {
-                "city"         : geo["name"],
-                "country"      : geo.get("country_code", ""),
-                "state"        : geo.get("admin1", ""),
-                "latitude"     : geo["latitude"],
-                "longitude"    : geo["longitude"],
-                "temperature"  : temp,
-                "feels_like"   : round(current.get("apparent_temperature", temp), 1),
-                "temp_min"     : temp_min,
-                "temp_max"     : temp_max,
-                "humidity"     : humidity,
-                "pressure"     : current.get("pressure_msl", 0),
-                "description"  : wmo["description"],
-                "icon"         : wmo["icon"],
-                "weather_code" : weather_code,
-                "is_day"       : current.get("is_day", 1),
-                "wind_speed"   : wind_speed,
-                "wind_direction": current.get("wind_direction_10m", 0),
-                "wind_gusts"   : round(current.get("wind_gusts_10m", 0), 1),
-                "clouds"       : current.get("cloud_cover", 0),
-                "rain"         : rain,
-                "precipitation": current.get("precipitation", 0),
-                "sunrise"      : daily.get("sunrise", [""])[0],
-                "sunset"       : daily.get("sunset", [""])[0],
-                "uv_index"     : daily.get("uv_index_max", [0])[0],
-                "data_source"  : "Open-Meteo (free, no API key)",
-            }
-
-            weather_data["farming_advice"] = generate_farming_advice(
-                temp, humidity, wind_speed, wmo["description"], rain
-            )
-
-            _set_weather_cache(city, weather_data)   # Cache for 5 min
-            return weather_data
-
-    except httpx.TimeoutException:
-        return {"error": True, "msg": "Weather request timed out. Please try again."}
-    except Exception as e:
-        return {"error": True, "msg": f"Failed to fetch weather: {str(e)}"}
+    _set_cache(_weather_cache, city, weather_data)   # Cache for 30 min
+    return weather_data
 
 
 async def get_forecast(city: str) -> dict:
-    """Get 7-day hourly/daily forecast using Open-Meteo API"""
+    """Get 7-day forecast — cached for 30 min per city."""
 
-    geo = await _geocode_city(city)
+    cached = _get_cache(_forecast_cache, city, _FORECAST_TTL)
+    if cached:
+        return cached
+
+    geo = _lookup_city(city) or await _geocode_city(city)
     if not geo:
-        return {"error": f"City '{city}' not found. Please check the city name and try again."}
+        return {"error": True, "msg": f"City '{city}' not found."}
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                FORECAST_URL,
-                params={
-                    "latitude": geo["latitude"],
-                    "longitude": geo["longitude"],
-                    "hourly": "temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,visibility",
-                    "daily": "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,precipitation_sum,rain_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max",
-                    "timezone": geo.get("timezone", "auto"),
-                    "forecast_days": 7,
-                }
-            )
+    params = {
+        "latitude"    : geo["latitude"],
+        "longitude"   : geo["longitude"],
+        "hourly"      : "temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,visibility",
+        "daily"       : "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,sunrise,sunset,precipitation_sum,rain_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max",
+        "timezone"    : geo.get("timezone", "auto"),
+        "forecast_days": 7,
+    }
 
-            if response.status_code != 200:
-                return {"error": f"Forecast service returned status {response.status_code}. Please try again."}
+    data = await _fetch_with_backoff(FORECAST_URL, params)
+    if data is None:
+        return {"error": True, "msg": "Forecast service unavailable. Please try again in a few minutes."}
 
-            data = response.json()
-            daily = data.get("daily", {})
-            hourly = data.get("hourly", {})
+    daily  = data.get("daily", {})
+    hourly = data.get("hourly", {})
 
-            # Build daily forecasts
-            daily_forecasts = []
-            times = daily.get("time", [])
-            for i, date in enumerate(times):
-                weather_code = daily.get("weather_code", [0])[i] if i < len(daily.get("weather_code", [])) else 0
-                wmo = _get_wmo_info(weather_code)
+    # Build daily forecasts with per-day farming advisory
+    daily_forecasts = []
+    for i, date in enumerate(daily.get("time", [])):
+        wc  = (daily.get("weather_code") or [])[i] if i < len(daily.get("weather_code") or []) else 0
+        wmo = _get_wmo_info(wc)
+        rain_d  = round((daily.get("rain_sum")            or [0])[i], 1)
+        wind_d  = round((daily.get("wind_speed_10m_max")  or [0])[i], 1)
+        uv_d    =       (daily.get("uv_index_max")        or [0])[i]
+        p_prob  =       (daily.get("precipitation_probability_max") or [0])[i]
+        tmax    = round((daily.get("temperature_2m_max")  or [0])[i], 1)
+        tmin    = round((daily.get("temperature_2m_min")  or [0])[i], 1)
 
-                daily_forecasts.append({
-                    "date": date,
-                    "weather_code": weather_code,
-                    "description": wmo["description"],
-                    "icon": wmo["icon"],
-                    "temp_max": round(daily.get("temperature_2m_max", [0])[i], 1),
-                    "temp_min": round(daily.get("temperature_2m_min", [0])[i], 1),
-                    "feels_max": round(daily.get("apparent_temperature_max", [0])[i], 1),
-                    "feels_min": round(daily.get("apparent_temperature_min", [0])[i], 1),
-                    "precipitation_sum": round(daily.get("precipitation_sum", [0])[i], 1),
-                    "rain_sum": round(daily.get("rain_sum", [0])[i], 1),
-                    "precipitation_hours": daily.get("precipitation_hours", [0])[i],
-                    "precipitation_probability": daily.get("precipitation_probability_max", [0])[i],
-                    "wind_speed_max": round(daily.get("wind_speed_10m_max", [0])[i], 1),
-                    "wind_gusts_max": round(daily.get("wind_gusts_10m_max", [0])[i], 1),
-                    "uv_index": daily.get("uv_index_max", [0])[i],
-                    "sunrise": daily.get("sunrise", [""])[i],
-                    "sunset": daily.get("sunset", [""])[i],
-                })
+        adv = generate_farming_advice((tmax + tmin) / 2, 60, wind_d, wmo["description"], rain_d, uv_d, p_prob)
 
-            # Build hourly forecasts (next 48 hours)
-            hourly_forecasts = []
-            h_times = hourly.get("time", [])
-            for i in range(min(48, len(h_times))):
-                weather_code = hourly.get("weather_code", [0])[i] if i < len(hourly.get("weather_code", [])) else 0
-                wmo = _get_wmo_info(weather_code)
+        daily_forecasts.append({
+            "date"                    : date,
+            "weather_code"            : wc,
+            "description"             : wmo["description"],
+            "icon"                    : wmo["icon"],
+            "temp_max"                : tmax,
+            "temp_min"                : tmin,
+            "feels_max"               : round((daily.get("apparent_temperature_max") or [tmax])[i], 1),
+            "feels_min"               : round((daily.get("apparent_temperature_min") or [tmin])[i], 1),
+            "precipitation_sum"       : round((daily.get("precipitation_sum")        or [0])[i], 1),
+            "rain_sum"                : rain_d,
+            "precipitation_hours"     :       (daily.get("precipitation_hours")       or [0])[i],
+            "precipitation_probability": p_prob,
+            "wind_speed_max"          : wind_d,
+            "wind_gusts_max"          : round((daily.get("wind_gusts_10m_max")       or [0])[i], 1),
+            "uv_index"                : uv_d,
+            "sunrise"                 :       (daily.get("sunrise")                   or [""])[i],
+            "sunset"                  :       (daily.get("sunset")                    or [""])[i],
+            "field_score"             : adv["field_score"],
+            "field_label"             : adv["field_label"],
+            "field_color"             : adv["field_color"],
+            "spray_suitable"          : adv["spray_suitable"],
+        })
 
-                hourly_forecasts.append({
-                    "datetime": h_times[i],
-                    "temperature": round(hourly.get("temperature_2m", [0])[i], 1),
-                    "humidity": hourly.get("relative_humidity_2m", [0])[i],
-                    "precipitation_probability": hourly.get("precipitation_probability", [0])[i],
-                    "precipitation": round(hourly.get("precipitation", [0])[i], 1),
-                    "weather_code": weather_code,
-                    "description": wmo["description"],
-                    "icon": wmo["icon"],
-                    "wind_speed": round(hourly.get("wind_speed_10m", [0])[i], 1),
-                    "visibility": round((hourly.get("visibility", [10000])[i] or 10000) / 1000, 1),
-                })
+    # Build hourly forecasts (next 48 h)
+    hourly_forecasts = []
+    h_times = hourly.get("time", [])
+    for i in range(min(48, len(h_times))):
+        wc  = (hourly.get("weather_code") or [0])[i] if i < len(hourly.get("weather_code") or []) else 0
+        wmo = _get_wmo_info(wc)
+        hourly_forecasts.append({
+            "datetime"               : h_times[i],
+            "temperature"            : round((hourly.get("temperature_2m")             or [0])[i], 1),
+            "humidity"               : (hourly.get("relative_humidity_2m")              or [0])[i],
+            "precipitation_probability": (hourly.get("precipitation_probability")       or [0])[i],
+            "precipitation"          : round((hourly.get("precipitation")               or [0])[i], 1),
+            "weather_code"           : wc,
+            "description"            : wmo["description"],
+            "icon"                   : wmo["icon"],
+            "wind_speed"             : round((hourly.get("wind_speed_10m")              or [0])[i], 1),
+            "visibility"             : round(((hourly.get("visibility") or [10000])[i] or 10000) / 1000, 1),
+        })
 
-            return {
-                "city": geo["name"],
-                "country": geo.get("country_code", ""),
-                "state": geo.get("admin1", ""),
-                "latitude": geo["latitude"],
-                "longitude": geo["longitude"],
-                "daily": daily_forecasts,
-                "hourly": hourly_forecasts,
-                "data_source": "Open-Meteo (free, no API key)",
-            }
-
-    except httpx.TimeoutException:
-        return {"error": "Forecast service request timed out. Please try again."}
-    except Exception as e:
-        return {"error": f"Failed to fetch forecast data: {str(e)}"}
+    result = {
+        "city"       : geo["name"],
+        "country"    : geo.get("country_code", ""),
+        "state"      : geo.get("admin1", ""),
+        "latitude"   : geo["latitude"],
+        "longitude"  : geo["longitude"],
+        "daily"      : daily_forecasts,
+        "hourly"     : hourly_forecasts,
+        "data_source": "Open-Meteo (free, no API key)",
+    }
+    _set_cache(_forecast_cache, city, result)
+    return result
