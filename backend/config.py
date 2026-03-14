@@ -27,7 +27,8 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        # Strip whitespace AND trailing slashes — browsers send origins without trailing slash
+        return [origin.strip().rstrip('/') for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
