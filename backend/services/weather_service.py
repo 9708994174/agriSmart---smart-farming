@@ -188,21 +188,20 @@ async def _geocode_city(city: str) -> Optional[dict]:
 async def get_weather(city: str) -> dict:
     """Get current weather data using Open-Meteo API (free, no API key required)"""
 
-    # Return cached weather if fresh
+    # Return cached weather if fresh (prevents 429 rate-limiting)
     cached = _get_weather_cached(city)
     if cached:
         return cached
 
-    # Step 1: Geocode city name to lat/lon
+    # Geocode city name to lat/lon (also cached for 24 h)
     geo = await _geocode_city(city)
     if not geo:
-        return {"error": True, "msg": f"City '{city}' not found. Please check the city name and try again."}
+        return {"error": True, "msg": f"City '{city}' not found. Please check the spelling and try again."}
 
-    for attempt in range(2):   # retry once on 429
-        try:
-            async with httpx.AsyncClient(timeout=12.0) as client:
-                response = await client.get(
-                    FORECAST_URL,
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                FORECAST_URL,
                 params={
                     "latitude": geo["latitude"],
                     "longitude": geo["longitude"],
@@ -214,73 +213,66 @@ async def get_weather(city: str) -> dict:
                 }
             )
 
-                if response.status_code == 429:
-                    if attempt == 0:
-                        import asyncio
-                        await asyncio.sleep(1)
-                        continue
-                    return {"error": True, "msg": "Weather service is busy (rate limited). Please try again in a moment."}
+            if response.status_code == 429:
+                return {"error": True, "msg": "Weather service is busy (rate limited). Please wait a moment and try again."}
 
-                if response.status_code != 200:
-                    return {"error": True, "msg": f"Weather service returned status {response.status_code}. Please try again later."}
+            if response.status_code != 200:
+                return {"error": True, "msg": f"Weather service returned status {response.status_code}. Please try again later."}
 
-            data = response.json()
+            data    = response.json()
             current = data.get("current", {})
-            daily = data.get("daily", {})
+            daily   = data.get("daily", {})
 
             weather_code = current.get("weather_code", 0)
-            wmo = _get_wmo_info(weather_code)
+            wmo          = _get_wmo_info(weather_code)
 
-            temp = round(current.get("temperature_2m", 0), 1)
-            humidity = current.get("relative_humidity_2m", 0)
+            temp       = round(current.get("temperature_2m", 0), 1)
+            humidity   = current.get("relative_humidity_2m", 0)
             wind_speed = round(current.get("wind_speed_10m", 0), 1)
-            rain = current.get("rain", 0) or 0
+            rain       = current.get("rain", 0) or 0
 
-            # Get today's min/max from daily
             temp_min = round(daily.get("temperature_2m_min", [0])[0], 1)
             temp_max = round(daily.get("temperature_2m_max", [0])[0], 1)
 
             weather_data = {
-                "city": geo["name"],
-                "country": geo.get("country_code", ""),
-                "state": geo.get("admin1", ""),
-                "latitude": geo["latitude"],
-                "longitude": geo["longitude"],
-                "temperature": temp,
-                "feels_like": round(current.get("apparent_temperature", temp), 1),
-                "temp_min": temp_min,
-                "temp_max": temp_max,
-                "humidity": humidity,
-                "pressure": current.get("pressure_msl", 0),
-                "description": wmo["description"],
-                "icon": wmo["icon"],
-                "weather_code": weather_code,
-                "is_day": current.get("is_day", 1),
-                "wind_speed": wind_speed,
+                "city"         : geo["name"],
+                "country"      : geo.get("country_code", ""),
+                "state"        : geo.get("admin1", ""),
+                "latitude"     : geo["latitude"],
+                "longitude"    : geo["longitude"],
+                "temperature"  : temp,
+                "feels_like"   : round(current.get("apparent_temperature", temp), 1),
+                "temp_min"     : temp_min,
+                "temp_max"     : temp_max,
+                "humidity"     : humidity,
+                "pressure"     : current.get("pressure_msl", 0),
+                "description"  : wmo["description"],
+                "icon"         : wmo["icon"],
+                "weather_code" : weather_code,
+                "is_day"       : current.get("is_day", 1),
+                "wind_speed"   : wind_speed,
                 "wind_direction": current.get("wind_direction_10m", 0),
-                "wind_gusts": round(current.get("wind_gusts_10m", 0), 1),
-                "clouds": current.get("cloud_cover", 0),
-                "rain": rain,
+                "wind_gusts"   : round(current.get("wind_gusts_10m", 0), 1),
+                "clouds"       : current.get("cloud_cover", 0),
+                "rain"         : rain,
                 "precipitation": current.get("precipitation", 0),
-                "sunrise": daily.get("sunrise", [""])[0],
-                "sunset": daily.get("sunset", [""])[0],
-                "uv_index": daily.get("uv_index_max", [0])[0],
-                "data_source": "Open-Meteo (free, no API key)",
+                "sunrise"      : daily.get("sunrise", [""])[0],
+                "sunset"       : daily.get("sunset", [""])[0],
+                "uv_index"     : daily.get("uv_index_max", [0])[0],
+                "data_source"  : "Open-Meteo (free, no API key)",
             }
 
             weather_data["farming_advice"] = generate_farming_advice(
                 temp, humidity, wind_speed, wmo["description"], rain
             )
 
-            _set_weather_cache(city, weather_data)  # Cache for 5 min
+            _set_weather_cache(city, weather_data)   # Cache for 5 min
             return weather_data
 
-        except httpx.TimeoutException:
-            return {"error": True, "msg": "Weather service request timed out. Please try again."}
-        except Exception as e:
-            return {"error": True, "msg": f"Failed to fetch weather data: {str(e)}"}
-
-    return {"error": True, "msg": "Weather service unavailable. Please try again later."}
+    except httpx.TimeoutException:
+        return {"error": True, "msg": "Weather request timed out. Please try again."}
+    except Exception as e:
+        return {"error": True, "msg": f"Failed to fetch weather: {str(e)}"}
 
 
 async def get_forecast(city: str) -> dict:

@@ -17,8 +17,13 @@ export default function WeatherPage() {
       const [wRes, fRes] = await Promise.all([
         weatherAPI.getCurrent(c), weatherAPI.getForecast(c)
       ]);
-      if (wRes.data.error) { setError(wRes.data.error); setWeather(null); }
-      else setWeather(wRes.data);
+      if (wRes.data.error) {
+        // Backend returns {error: true, msg: '...'} or {error: 'legacy string'}
+        setError(wRes.data.msg || wRes.data.error || 'Unable to fetch weather.');
+        setWeather(null);
+      } else {
+        setWeather(wRes.data);
+      }
       if (fRes.data.daily) setForecast(fRes.data);
       else setForecast(null);
     } catch (err) { setError(err.response?.data?.detail || 'Unable to fetch weather data.'); }
