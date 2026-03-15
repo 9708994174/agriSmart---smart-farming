@@ -76,12 +76,6 @@ export default function ForgotPasswordPage() {
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 16, margin: '0 auto 14px',
-            background: 'linear-gradient(135deg, #2d7a3a, #1b5a28)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24
-          }}>🔑</div>
           <h1 style={{ fontSize: 24, fontWeight: 800, fontFamily: 'Outfit', color: '#1a2e1a', margin: '0 0 6px' }}>
             {step === 1 ? 'Forgot Password' : step === 2 ? 'Reset Password' : 'All Done!'}
           </h1>

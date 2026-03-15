@@ -4,8 +4,16 @@ Free, open-source weather API — NO API key required.
 https://open-meteo.com/en/docs
 """
 import httpx
+import ssl
+import certifi
 import time
 from typing import Optional
+
+# SSL context for production (Render/Railway may have stale CA certs)
+try:
+    _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+except Exception:
+    _ssl_ctx = True  # fallback to default
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL  = "https://api.open-meteo.com/v1/forecast"
@@ -294,7 +302,7 @@ async def _fetch_with_backoff(url: str, params: dict, max_retries: int = 3) -> O
     delay = 2
     for attempt in range(max_retries):
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=20.0, verify=_ssl_ctx) as client:
                 resp = await client.get(url, params=params)
                 if resp.status_code == 200:
                     return resp.json()
@@ -311,13 +319,18 @@ async def _fetch_with_backoff(url: str, params: dict, max_retries: int = 3) -> O
             if attempt < max_retries - 1:
                 await asyncio.sleep(delay)
                 delay *= 2
+        except Exception as e:
+            print(f"[ERROR] Unexpected error in _fetch_with_backoff: {type(e).__name__}: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(delay)
+                delay *= 2
     return None
 
 
 async def _fallback_wttr(city: str) -> Optional[dict]:
     """Technique 6: Fallback to wttr.in if Open-Meteo is completely unavailable."""
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=_ssl_ctx) as client:
             resp = await client.get(
                 f"https://wttr.in/{city}",
                 params={"format": "j1"},
@@ -367,7 +380,7 @@ async def _geocode_city(city: str) -> Optional[dict]:
 
     # Step 2: geocoding API (only for cities not in our dictionary)
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, verify=_ssl_ctx) as client:
             response = await client.get(
                 GEOCODING_URL,
                 params={
