@@ -64,7 +64,7 @@ export default function MarketPage() {
 
       {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: trends ? '1fr 380px' : '1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: trends ? 'repeat(auto-fit, minmax(340px, 1fr))' : '1fr', gap: 20 }}>
         <div>
           {loading ? (
             <div className="flex-center" style={{ padding: 48 }}><div className="spinner" /></div>

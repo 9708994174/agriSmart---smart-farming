@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { communityAPI } from '../services/api';
+import { useToast } from '../components/Toast';
 
 export default function CommunityPage() {
     const { user } = useAuth();
@@ -11,6 +12,7 @@ export default function CommunityPage() {
     const [posting, setPosting] = useState(false);
     const [replyInput, setReplyInput] = useState({});
     const [expandedPost, setExpandedPost] = useState(null);
+    const toast = useToast();
 
     useEffect(() => { loadPosts(); }, []);
 
@@ -32,8 +34,9 @@ export default function CommunityPage() {
             setNewPost('');
             setNewTags('');
             await loadPosts();
+            toast.success('Post created!');
         } catch (err) {
-            alert(err.response?.data?.detail || 'Failed to create post');
+            toast.error(err.response?.data?.detail || 'Failed to create post');
         } finally { setPosting(false); }
     };
 
@@ -44,8 +47,9 @@ export default function CommunityPage() {
             await communityAPI.replyToPost(postId, { content });
             setReplyInput(p => ({ ...p, [postId]: '' }));
             await loadPosts();
+            toast.success('Reply posted!');
         } catch (err) {
-            alert(err.response?.data?.detail || 'Failed to reply');
+            toast.error(err.response?.data?.detail || 'Failed to reply');
         }
     };
 
@@ -54,8 +58,9 @@ export default function CommunityPage() {
         try {
             await communityAPI.deletePost(postId);
             await loadPosts();
+            toast.success('Post deleted.');
         } catch (err) {
-            alert(err.response?.data?.detail || 'Failed to delete');
+            toast.error(err.response?.data?.detail || 'Failed to delete');
         }
     };
 

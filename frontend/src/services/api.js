@@ -35,6 +35,9 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  googleLogin: (data) => api.post('/auth/google-login', data),
+  forgotPassword: (data) => api.post('/auth/forgot-password', data),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
   getProfile: () => api.get('/auth/me'),
   updateProfile: (data) => api.put('/auth/profile', data),
 };
@@ -81,6 +84,7 @@ export const predictAPI = {
 export const weatherAPI = {
   getCurrent: (city) => api.get(`/weather?city=${city}`),
   getForecast: (city) => api.get(`/weather/forecast?city=${city}`),
+  getByLocation: (lat, lon) => api.get(`/weather/bylocation?lat=${lat}&lon=${lon}`),
 };
 
 export const marketAPI = {
@@ -91,6 +95,14 @@ export const marketAPI = {
     return api.get(`/market-prices?${params.toString()}`);
   },
   getTrends: (crop) => api.get(`/market-prices/trends?crop=${crop}`),
+};
+
+export const govPoliciesAPI = {
+  getAll: (category) => {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    return api.get(`/gov-policies?${params.toString()}`);
+  },
 };
 
 export const dashboardAPI = {

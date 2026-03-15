@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { weatherAPI } from '../services/api';
 
 const CITIES = ['Delhi', 'Ludhiana', 'Chandigarh', 'Jaipur', 'Lucknow', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Patna', 'Pune'];
@@ -57,6 +57,43 @@ export default function WeatherPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [tab, setTab]         = useState('overview');
+  const [geoStatus, setGeoStatus] = useState(''); // 'detecting', 'done', 'denied', ''
+
+  // Auto-detect location on mount
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      setGeoStatus('detecting');
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          setGeoStatus('done');
+          setLoading(true);
+          try {
+            const wRes = await weatherAPI.getByLocation(pos.coords.latitude, pos.coords.longitude);
+            if (wRes.data && !wRes.data.error) {
+              setWeather(wRes.data);
+              setCity(wRes.data.city || '');
+              setTab('overview');
+              // Also fetch forecast using the detected city
+              if (wRes.data.city) {
+                try {
+                  const fRes = await weatherAPI.getForecast(wRes.data.city);
+                  if (fRes.data?.daily) setForecast(fRes.data);
+                } catch {}
+              }
+            }
+          } catch (err) {
+            setError('Could not fetch weather for your location.');
+          } finally {
+            setLoading(false);
+          }
+        },
+        () => {
+          setGeoStatus('denied');
+        },
+        { timeout: 8000, maximumAge: 300000 }
+      );
+    }
+  }, []);
 
   const fetchWeather = async (searchCity) => {
     const c = (searchCity || city).trim();
@@ -80,6 +117,35 @@ export default function WeatherPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUseMyLocation = () => {
+    if (!('geolocation' in navigator)) { setError('Geolocation is not supported by your browser.'); return; }
+    setGeoStatus('detecting'); setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setGeoStatus('done');
+        try {
+          const wRes = await weatherAPI.getByLocation(pos.coords.latitude, pos.coords.longitude);
+          if (wRes.data && !wRes.data.error) {
+            setWeather(wRes.data);
+            setCity(wRes.data.city || '');
+            setTab('overview');
+            if (wRes.data.city) {
+              try {
+                const fRes = await weatherAPI.getForecast(wRes.data.city);
+                if (fRes.data?.daily) setForecast(fRes.data);
+              } catch {}
+            }
+          } else {
+            setError(wRes.data?.msg || 'Unable to get weather.');
+          }
+        } catch { setError('Failed to fetch weather for your location.'); }
+        finally { setLoading(false); }
+      },
+      () => { setGeoStatus('denied'); setLoading(false); setError('Location permission denied. Please enter a city manually.'); },
+      { timeout: 8000 }
+    );
   };
 
   const adv  = weather?.farming_advisory || {};
@@ -108,17 +174,17 @@ export default function WeatherPage() {
 
       {/* Search Bar */}
       <div className="card" style={{ marginBottom: 20, padding: 16 }}>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <input
             className="input-field"
             placeholder="Enter city name (e.g., Ludhiana, Jaipur, Delhi...)"
             value={city}
             onChange={e => setCity(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && fetchWeather()}
-            style={{ flex: 1 }}
+            style={{ flex: 1, minWidth: 160 }}
           />
           <button onClick={() => fetchWeather()} className="btn btn-primary" disabled={loading}
-            style={{ minWidth: 130, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+            style={{ minWidth: 120, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
             {loading ? (
               <>
                 {[0,1,2].map(i => (
@@ -131,7 +197,15 @@ export default function WeatherPage() {
               </>
             ) : '🔍 Get Weather'}
           </button>
+          <button onClick={handleUseMyLocation} className="btn btn-secondary" disabled={loading}
+            style={{ minWidth: 120, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+            📍 My Location
+          </button>
         </div>
+
+        {geoStatus === 'detecting' && (
+          <div style={{ marginTop: 8, fontSize: 12, color: '#2d7a3a' }}>📡 Detecting your location...</div>
+        )}
 
         {/* Quick city buttons */}
         <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
@@ -178,7 +252,7 @@ export default function WeatherPage() {
               borderRadius: '50%', background: 'rgba(255,255,255,0.04)'
             }} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'center', position: 'relative' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, alignItems: 'center', position: 'relative' }}>
               <div>
                 <p style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>
                   📍 {weather.city}{weather.state ? `, ${weather.state}` : ''} · {weather.latitude?.toFixed(2)}°N, {weather.longitude?.toFixed(2)}°E
@@ -261,11 +335,11 @@ export default function WeatherPage() {
 
           {/* ── TAB: OVERVIEW ── */}
           {tab === 'overview' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
               {/* Conditions grid */}
               <div className="card">
                 <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>☁️ Current Conditions</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
                   <StatCard icon="🌡️" label="Feels Like" value={`${weather.feels_like}°C`} />
                   <StatCard icon="💧" label="Humidity" value={`${weather.humidity}%`}
                     accent={weather.humidity > 80 ? '#d97706' : '#2d7a3a'} />
@@ -311,7 +385,7 @@ export default function WeatherPage() {
 
           {/* ── TAB: ADVISORY ── */}
           {tab === 'advisory' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
               {/* Warnings */}
               {adv.warnings?.length > 0 && (
                 <div className="card" style={{ borderLeft: '4px solid #dc2626' }}>
@@ -345,7 +419,7 @@ export default function WeatherPage() {
               {/* Best time to work */}
               <div className="card" style={{ gridColumn: '1 / -1' }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>🕐 Best Farming Windows Today</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
                   {[
                     { time: '5–7 AM', icon: '🌅', activity: 'Irrigation & Watering', good: weather.temperature < 35, reason: 'Cool & low evaporation' },
                     { time: '8–11 AM', icon: '🌤️', activity: 'Pesticide Spray', good: adv.spray_suitable, reason: adv.spray_suitable ? 'Calm & suitable' : 'Wind/rain risk' },
@@ -385,7 +459,7 @@ export default function WeatherPage() {
                   Each day includes field activity score & spray suitability for planning your week
                 </p>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 0 }}>
                 {forecast.daily.map((f, i) => (
                   <div key={i} style={{
                     padding: '16px 10px', textAlign: 'center',

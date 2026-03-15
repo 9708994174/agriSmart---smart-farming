@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { predictAPI } from '../services/api';
+import { useToast } from '../components/Toast';
 
 export default function CropRecommendationPage() {
   const [form, setForm] = useState({ nitrogen: '', phosphorus: '', potassium: '', temperature: '', humidity: '', ph: '', rainfall: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast();
 
   const presets = [
     { label: '🌾 Rice Season', values: { nitrogen: 80, phosphorus: 48, potassium: 40, temperature: 28, humidity: 80, ph: 6.5, rainfall: 200 } },
@@ -31,9 +33,22 @@ export default function CropRecommendationPage() {
         if (!v && v !== 0) { setError(`Please enter ${k}`); setLoading(false); return; }
         data[k] = parseFloat(v);
       }
-      const res = await predictAPI.cropRecommendation(data);
-      setResult(res.data);
-    } catch (err) { setError(err.response?.data?.detail || 'Prediction failed. Please try again.'); }
+      // Retry logic: up to 3 attempts
+      let lastErr;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await predictAPI.cropRecommendation(data);
+          setResult(res.data);
+          toast.success('Crop recommendation ready!');
+          return;
+        } catch (err) {
+          lastErr = err;
+          if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt)); // Wait 1s, 2s
+        }
+      }
+      setError(lastErr?.response?.data?.detail || 'Prediction failed after multiple attempts. Please try again.');
+      toast.error('Prediction failed. Please try again.');
+    } catch (err) { setError(err.response?.data?.detail || 'Prediction failed. Please try again.'); toast.error('Something went wrong.'); }
     finally { setLoading(false); }
   };
 
@@ -56,7 +71,7 @@ export default function CropRecommendationPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="card">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 }}>
               {fields.map(f => (
                 <div key={f.key} className="input-group">
                   <label>{f.label} {f.unit && <span style={{ color: 'var(--text-muted)' }}>({f.unit})</span>}</label>

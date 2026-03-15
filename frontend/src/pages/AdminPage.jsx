@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api, { weatherAPI } from '../services/api';
 import { authAPI } from '../services/api';
+import { useToast } from '../components/Toast';
 
 const STATES = ['Andhra Pradesh', 'Bihar', 'Chhattisgarh', 'Delhi', 'Goa', 'Gujarat', 'Haryana',
   'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Odisha', 'Punjab',
@@ -12,6 +13,7 @@ export default function AdminPage() {
   const { user, updateUser } = useAuth();
   const [params] = useSearchParams();
   const sec = params.get('s') || 'dashboard';
+  const toast = useToast();
 
   const [stats, setStats] = useState({});
   const [users, setUsers] = useState([]);
@@ -80,30 +82,30 @@ export default function AdminPage() {
     if (!window.confirm('Delete this user and all their data? This cannot be undone.')) return;
     setBusy(id);
     try { await api.delete(`/dashboard/admin/users/${id}`); setUsers(p => p.filter(u => u._id !== id)); }
-    catch (e) { alert('Failed: ' + (e.response?.data?.detail || e.message)); }
+    catch (e) { toast.error('Failed: ' + (e.response?.data?.detail || e.message)); }
     setBusy('');
   };
 
   const toggleRole = async (id) => {
     setBusy(id);
     try { const r = await api.put(`/dashboard/admin/users/${id}/role`); setUsers(p => p.map(u => u._id === id ? { ...u, role: r.data.new_role } : u)); }
-    catch (e) { alert('Failed: ' + (e.response?.data?.detail || e.message)); }
+    catch (e) { toast.error('Failed: ' + (e.response?.data?.detail || e.message)); }
     setBusy('');
   };
 
   const deleteFeedback = async (id) => {
-    try { await api.delete(`/dashboard/admin/feedback/${id}`); setFeedback(p => p.filter(f => f._id !== id)); }
-    catch { alert('Failed to delete'); }
+    try { await api.delete(`/dashboard/admin/feedback/${id}`); setFeedback(p => p.filter(f => f._id !== id)); toast.success('Feedback deleted.'); }
+    catch { toast.error('Failed to delete'); }
   };
 
   const saveSettings = async () => {
-    try { await api.put('/dashboard/admin/settings', sysSettings); alert('✅ Settings saved!'); }
-    catch { alert('Failed to save settings'); }
+    try { await api.put('/dashboard/admin/settings', sysSettings); toast.success('Settings saved!'); }
+    catch { toast.error('Failed to save settings'); }
   };
 
   const saveProfile = async () => {
     setProfLoad(true); setProfErr(''); setProfOK('');
-    try { await authAPI.updateProfile(profForm); updateUser(profForm); setProfOK('Profile updated!'); setProfEdit(false); }
+    try { await authAPI.updateProfile(profForm); updateUser(profForm); setProfOK('Profile updated!'); toast.success('Profile updated!'); setProfEdit(false); }
     catch (e) { setProfErr(e.response?.data?.detail || 'Failed to update.'); }
     setProfLoad(false);
   };
@@ -237,7 +239,7 @@ export default function AdminPage() {
   const renderDashboard = () => (
     <div className="animate-fadeIn">
       <SH title="Admin Dashboard" right={<Btn onClick={loadAll} small>↻ Refresh</Btn>} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <StatCard title="👨‍🌾 Total Farmers" value={stats.total_farmers || 0} sub={`+${stats.new_this_month || 0} this month`} color="#2d7a3a" />
         <StatCard title="💬 Chatbot Queries" value={stats.chatbot_queries_month || 0} sub={`${stats.today_queries || 0} today`} color="#1565c0" />
         <StatCard title="🌾 Crop Predictions" value={stats.total_predictions || 0} sub={`${stats.crop_predictions_today || 0} today`} color="#7b1fa2" />
@@ -443,7 +445,7 @@ export default function AdminPage() {
       ) : weatherData.error ? (
         <div className="alert alert-error">❌ {weatherData.msg || 'Could not fetch weather. Try another city name.'}</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <div className="admin-weather-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           <StatCard title="🌡️ Temperature" value={`${weatherData.temperature ?? '--'}°C`} sub={weatherData.description || ''} color="#e65100" />
           <StatCard title="💧 Humidity" value={`${weatherData.humidity ?? '--'}%`} sub={`Feels like ${weatherData.feels_like ?? '--'}°C`} color="#1565c0" />
           <StatCard title="🌬️ Wind Speed" value={`${weatherData.wind_speed ?? '--'} km/h`} sub={`${weatherData.city || weatherCity}${weatherData.state ? ', ' + weatherData.state : ''}`} color="#2d7a3a" />
@@ -503,7 +505,7 @@ export default function AdminPage() {
         </div>
       } />
       {chatbotStats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
+        <div className="admin-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
           <StatCard title="📊 Queries (7 days)" value={chatbotStats.daily_queries?.reduce((s, d) => s + d.count, 0) || 0} color="#7b1fa2" />
           <StatCard title="🌐 Languages Used" value={chatbotStats.language_distribution?.length || 0} color="#1565c0" />
           <StatCard title="🔬 Disease Scans (7d)" value={chatbotStats.disease_daily?.reduce((s, d) => s + d.count, 0) || 0} color="#e65100" />
@@ -568,14 +570,14 @@ export default function AdminPage() {
   const renderAnalytics = () => (
     <div className="animate-fadeIn">
       <SH title="📊 System Analytics" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         <StatCard title="👥 Total Users" value={stats.total_users || 0} color="#1565c0" />
         <StatCard title="💬 Total Chats" value={stats.total_chats || 0} color="#7b1fa2" />
         <StatCard title="🌾 Total Predictions" value={stats.total_predictions || 0} color="#2d7a3a" />
         <StatCard title="🔬 Disease Detections" value={stats.total_disease_detections || 0} color="#e65100" />
       </div>
       {chatbotStats && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="admin-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div className="card">
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#1a2e1a' }}>📈 Daily Queries (7 days)</h3>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 130 }}>
@@ -623,7 +625,7 @@ export default function AdminPage() {
       <SH title="👤 My Profile" />
       {profSuccess && <div className="alert alert-success" style={{ marginBottom: 16 }}>✅ {profSuccess}</div>}
       {profError && <div className="alert alert-error" style={{ marginBottom: 16 }}>❌ {profError}</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="admin-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700, color: 'white' }}>
@@ -673,7 +675,7 @@ export default function AdminPage() {
   const renderSettings = () => (
     <div className="animate-fadeIn">
       <SH title="⚙️ System Settings" right={<Btn onClick={saveSettings} primary>💾 Save Settings</Btn>} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="admin-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <div className="card">
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🌐 General</h3>
           <div style={{ display: 'grid', gap: 14 }}>

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
+import { auth, googleProvider, signInWithPopup } from '../services/firebase';
 
 const AuthContext = createContext(null);
 
@@ -38,6 +39,27 @@ export function AuthProvider({ children }) {
     return userData;
   };
 
+  // ── Google Sign-In ──
+  const loginWithGoogle = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    const googleUser = result.user;
+
+    // Send to our backend for JWT creation
+    const res = await authAPI.googleLogin({
+      name: googleUser.displayName || 'Farmer',
+      email: googleUser.email,
+      google_id: googleUser.uid,
+      photo: googleUser.photoURL || '',
+    });
+
+    const { access_token, user: userData } = res.data;
+    localStorage.setItem('token', access_token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setToken(access_token);
+    setUser(userData);
+    return userData;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -52,7 +74,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, loginWithGoogle, logout, updateUser, isAuthenticated: !!token }}>
       {children}
     </AuthContext.Provider>
   );

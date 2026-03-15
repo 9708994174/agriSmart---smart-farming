@@ -9,6 +9,7 @@ const farmerItems = [
   { path: '/disease-detection', label: 'Disease Detection', icon: 'scan' },
   { path: '/weather', label: 'Weather', icon: 'cloud' },
   { path: '/market', label: 'Market Prices', icon: 'chart' },
+  { path: '/gov-policies', label: 'Govt Policies', icon: 'policy' },
   { path: '/community', label: 'Community', icon: 'users' },
 ];
 
@@ -105,6 +106,11 @@ const NavIcon = ({ type, size = 18 }) => {
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
       </svg>
     ),
+    policy: (
+      <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
     logout: (
       <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -115,7 +121,7 @@ const NavIcon = ({ type, size = 18 }) => {
   return icons[type] || null;
 };
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -129,7 +135,14 @@ export default function Sidebar() {
   if (isAdminPage) {
     // ── ADMIN sidebar ─────────────────────────────────
     return (
-      <aside className="sidebar">
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+        {/* Mobile close button */}
+        <button className="sidebar-close-btn" onClick={onClose} style={{
+          position: 'absolute', top: 12, right: 12, width: 32, height: 32,
+          border: 'none', background: 'rgba(255,255,255,0.1)', borderRadius: 8,
+          color: '#c8e6c9', fontSize: 18, cursor: 'pointer', display: 'none',
+          alignItems: 'center', justifyContent: 'center', zIndex: 10,
+        }}>✕</button>
         <Link to="/admin?s=dashboard" className="sidebar-logo">
           <h1>AGRISMART</h1>
         </Link>
@@ -179,7 +192,14 @@ export default function Sidebar() {
     : farmerItems;
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+      {/* Mobile close button */}
+      <button className="sidebar-close-btn" onClick={onClose} style={{
+        position: 'absolute', top: 12, right: 12, width: 32, height: 32,
+        border: 'none', background: 'rgba(255,255,255,0.1)', borderRadius: 8,
+        color: '#c8e6c9', fontSize: 18, cursor: 'pointer', display: 'none',
+        alignItems: 'center', justifyContent: 'center', zIndex: 10,
+      }}>✕</button>
       <Link to="/dashboard" className="sidebar-logo">
         <h1>AGRISMART</h1>
       </Link>

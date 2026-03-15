@@ -15,6 +15,8 @@ import AdminPage from './pages/AdminPage';
 import CommunityPage from './pages/CommunityPage';
 import HistoryPage from './pages/HistoryPage';
 import ProfilePage from './pages/ProfilePage';
+import GovPoliciesPage from './pages/GovPoliciesPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 
 export default function App() {
   return (
@@ -25,6 +27,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* Admin — uses the same Layout as farmer pages */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -39,6 +42,7 @@ export default function App() {
             <Route path="/disease-detection" element={<DiseaseDetectionPage />} />
             <Route path="/weather" element={<WeatherPage />} />
             <Route path="/market" element={<MarketPage />} />
+            <Route path="/gov-policies" element={<GovPoliciesPage />} />
             <Route path="/community" element={<CommunityPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
@@ -50,3 +54,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

@@ -20,8 +20,40 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
+    # Seed admin user if not exists
+    await seed_admin()
     yield
     await close_mongo_connection()
+
+
+async def seed_admin():
+    """Create admin@gmail.com with password 123456 if no admin exists."""
+    from database import get_database
+    from middleware.auth import hash_password
+    from datetime import datetime
+
+    db = get_database()
+    if db is None:
+        return
+
+    existing_admin = await db.users.find_one({"email": "admin@gmail.com"})
+    if existing_admin:
+        return  # Admin already exists
+
+    admin_doc = {
+        "name": "Admin",
+        "email": "admin@gmail.com",
+        "password": hash_password("123456"),
+        "phone": "",
+        "role": "admin",
+        "language": "en",
+        "location": {"state": "", "district": "", "city": ""},
+        "farm_details": {"farm_size": "", "farm_size_unit": "acres", "crops": [], "soil_type": "", "irrigation_type": ""},
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    await db.users.insert_one(admin_doc)
+    print("[SEED] ✅ Admin user created: admin@gmail.com / 123456")
 
 
 app = FastAPI(

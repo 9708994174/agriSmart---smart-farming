@@ -20,12 +20,12 @@ export default function ChatbotPage() {
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const utteranceRef = useRef(null);
-  const voiceModeRef    = useRef(false);   // Tracks voiceMode for callbacks without stale closure
-  const isSendingRef    = useRef(false);   // Prevents duplicate sends in voice mode
-  const isLoadingRef    = useRef(false);   // Mirrors loading for recognition callbacks
-  const interruptRef    = useRef(null);    // Kept for cleanup only (no longer used for echo-prone background mic)
+  const voiceModeRef = useRef(false);   // Tracks voiceMode for callbacks without stale closure
+  const isSendingRef = useRef(false);   // Prevents duplicate sends in voice mode
+  const isLoadingRef = useRef(false);   // Mirrors loading for recognition callbacks
+  const interruptRef = useRef(null);    // Kept for cleanup only (no longer used for echo-prone background mic)
   const speechCancelledRef = useRef(false); // Set true when we manually cancel TTS to stop speakNext chain
-  const isSpeakingRef  = useRef(false);   // Mirrors isSpeaking state for startListening guard
+  const isSpeakingRef = useRef(false);   // Mirrors isSpeaking state for startListening guard
 
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -102,13 +102,13 @@ export default function ChatbotPage() {
       }
 
       const utterance = new SpeechSynthesisUtterance(sentences[currentIdx].trim());
-      utterance.lang   = speechLangMap[language] || 'en-IN';
-      utterance.rate   = voiceSpeed;
-      utterance.pitch  = 1.0;
+      utterance.lang = speechLangMap[language] || 'en-IN';
+      utterance.rate = voiceSpeed;
+      utterance.pitch = 1.0;
       utterance.volume = 1;
 
-      const voices    = window.speechSynthesis.getVoices();
-      const langCode  = utterance.lang.split('-')[0];
+      const voices = window.speechSynthesis.getVoices();
+      const langCode = utterance.lang.split('-')[0];
       const matchingVoice =
         voices.find(v => v.lang.startsWith(langCode) && !v.localService) ||
         voices.find(v => v.lang.startsWith(langCode));
@@ -149,7 +149,7 @@ export default function ChatbotPage() {
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
     setSpeakingMsgIdx(-1);
-    if (interruptRef.current) { try { interruptRef.current.stop(); } catch {} interruptRef.current = null; }
+    if (interruptRef.current) { try { interruptRef.current.stop(); } catch { } interruptRef.current = null; }
   }, []);
 
   // ─── Speech Recognition — fixed to prevent duplicate sends & stop/pause keywords ───
@@ -412,91 +412,31 @@ export default function ChatbotPage() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 100px)', minHeight: 0 }}>
       {/* Header */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 12
+        marginBottom: 12, flexWrap: 'wrap', gap: 8
       }}>
-        <div>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Kisan AI Assistant • {voiceMode ? '🎙️ Voice Conversation Active' : 'Voice Enabled 🎤'}
-          </p>
-          <h2 style={{ fontSize: 22, fontWeight: 800, fontFamily: 'Outfit' }}>
-            Namaste, <span style={{ color: 'var(--primary)' }}>{user?.name?.split(' ')[0] || 'Farmer'}!</span>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, fontFamily: 'Outfit', margin: '0 0 2px 0' }}>
+            Hi, <span style={{ color: 'var(--primary)' }}>{user?.name?.split(' ')[0] || 'Farmer'}!</span>
           </h2>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {voiceMode
-              ? '🔊 Voice mode — I listen and reply with voice automatically'
-              : `Ask anything about farming — type or use voice in ${langMap[language]}`}
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+            Your smart farming assistant — ask anything
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Language selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <select value={language} onChange={e => { setLanguage(e.target.value); stopSpeaking(); }}
             style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)',
-              fontSize: 13, background: 'white', cursor: 'pointer'
+              padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)',
+              fontSize: 12, background: 'white', cursor: 'pointer'
             }}>
             {Object.entries(langMap).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-
-          {/* Speed control */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px',
-            borderRadius: 8, border: '1px solid var(--border)', background: 'white', fontSize: 11
-          }}>
-            <span>🏃</span>
-            <select value={voiceSpeed} onChange={e => setVoiceSpeed(parseFloat(e.target.value))}
-              style={{ border: 'none', outline: 'none', fontSize: 11, background: 'transparent', cursor: 'pointer' }}>
-              <option value={0.75}>0.75x</option>
-              <option value={0.9}>0.9x</option>
-              <option value={1.0}>1.0x</option>
-              <option value={1.15}>1.15x</option>
-              <option value={1.3}>1.3x</option>
-            </select>
-          </div>
-
-          {/* Auto-speak toggle */}
-          <button onClick={() => setAutoSpeak(!autoSpeak)}
-            title={autoSpeak ? 'Auto-speak ON' : 'Auto-speak OFF'}
-            style={{
-              padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-              border: `1px solid ${autoSpeak ? '#2d7a3a' : 'var(--border)'}`,
-              background: autoSpeak ? '#e8f5e9' : 'white',
-              color: autoSpeak ? '#2d7a3a' : 'var(--text-muted)',
-              transition: 'all 0.2s'
-            }}>
-            {autoSpeak ? '🔊 Auto' : '🔇 Auto'}
-          </button>
-
-          {/* Voice Mode Button — ChatGPT-like */}
-          <button onClick={toggleVoiceMode}
-            title={voiceMode ? 'Exit voice mode' : 'Start voice conversation (like ChatGPT)'}
-            style={{
-              padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              border: 'none',
-              background: voiceMode
-                ? 'linear-gradient(135deg, #dc2626, #ef4444)'
-                : 'linear-gradient(135deg, #2d7a3a, #1b5a28)',
-              color: 'white',
-              boxShadow: voiceMode ? '0 2px 12px rgba(220,38,38,0.3)' : '0 2px 12px rgba(45,122,58,0.3)',
-              transition: 'all 0.3s',
-              animation: voiceMode ? 'pulse 2s infinite' : 'none'
-            }}>
-            {voiceMode ? '⏹️ End Voice' : '🎙️ Voice Chat'}
-          </button>
-
-          {isSpeaking && (
-            <button onClick={stopSpeaking} style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid #fecaca',
-              background: '#fef2f2', cursor: 'pointer', fontSize: 12, fontWeight: 500, color: '#dc2626'
-            }}>🔇 Stop</button>
-          )}
-
           <button onClick={clearChat} style={{
             padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)',
-            background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 500
+            background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 500
           }}>Clear</button>
         </div>
       </div>
@@ -558,15 +498,9 @@ export default function ChatbotPage() {
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🌾</div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Welcome to Kisan AI</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, maxWidth: 480, margin: '0 auto 12px' }}>
-              I'm your AI-powered farming assistant. Ask me anything — type or tap the 🎤 microphone to speak!
-            </p>
-            <p style={{ fontSize: 13, color: 'var(--primary)', marginBottom: 8, fontWeight: 600 }}>
-              🎙️ Try <strong>Voice Chat</strong> mode — I'll listen and reply with voice, just like ChatGPT!
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24 }}>
-              🔊 Auto voice reply is {autoSpeak ? 'ON' : 'OFF'} • Language: {langMap[language]}
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>AgriSmart AI Assistant</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 420, margin: '0 auto 20px' }}>
+              Your AI farming expert — ask about crops, weather, diseases, schemes & more.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', maxWidth: 500, margin: '0 auto' }}>
               {suggestions.map((s) => (
@@ -602,7 +536,7 @@ export default function ChatbotPage() {
               </div>
             )}
             <div style={{
-              maxWidth: '70%', padding: '12px 16px', borderRadius: 14,
+              maxWidth: '85%', padding: '10px 14px', borderRadius: 14,
               background: m.role === 'user' ? 'var(--primary)' : '#f0faf0',
               color: m.role === 'user' ? 'white' : 'var(--text-primary)',
               fontSize: 14, lineHeight: 1.6,
@@ -707,11 +641,15 @@ export default function ChatbotPage() {
                   <img src={URL.createObjectURL(f)} alt={f.name}
                     style={{ width: 64, height: 64, objectFit: 'cover', display: 'block' }} />
                 ) : (
-                  <div style={{ width: 64, height: 64, display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center', padding: 4 }}>
+                  <div style={{
+                    width: 64, height: 64, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', padding: 4
+                  }}>
                     <span style={{ fontSize: 20 }}>📄</span>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', textAlign: 'center',
-                      wordBreak: 'break-all', marginTop: 2 }}>{f.name.slice(0, 12)}</span>
+                    <span style={{
+                      fontSize: 9, color: 'rgba(255,255,255,0.6)', textAlign: 'center',
+                      wordBreak: 'break-all', marginTop: 2
+                    }}>{f.name.slice(0, 12)}</span>
                   </div>
                 )}
                 <button onClick={() => setAttachedFiles(prev => prev.filter((_, j) => j !== i))}
@@ -772,9 +710,9 @@ export default function ChatbotPage() {
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
             placeholder={
               isListening ? '🎤 Listening… speak now'
-              : language === 'hi' ? 'कुछ भी पूछें...'
-              : language === 'pa' ? 'ਕੁਝ ਵੀ ਪੁੱਛੋ...'
-              : 'Ask anything...'
+                : language === 'hi' ? 'कुछ भी पूछें...'
+                  : language === 'pa' ? 'ਕੁਝ ਵੀ ਪੁੱਛੋ...'
+                    : 'Ask anything...'
             }
             disabled={loading}
             style={{
@@ -787,8 +725,10 @@ export default function ChatbotPage() {
 
           {/* REC indicator */}
           {isListening && (
-            <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 700,
-              animation: 'blink 1s infinite', flexShrink: 0 }}>● REC</span>
+            <span style={{
+              fontSize: 10, color: '#ef4444', fontWeight: 700,
+              animation: 'blink 1s infinite', flexShrink: 0
+            }}>● REC</span>
           )}
 
           {/* Mic button — voice-to-text recorder */}
@@ -836,9 +776,9 @@ export default function ChatbotPage() {
           >
             {/* Waveform bars icon */}
             <svg width="18" height="18" viewBox="0 0 100 60">
-              {[8,22,36,50,64,78,92].map((x, i) => (
-                <rect key={x} x={x-5} y={15 + [8,2,12,0,10,4,9][i]} width="10"
-                  height={[20,32,16,40,18,28,22][i]} rx="5" fill="currentColor" />
+              {[8, 22, 36, 50, 64, 78, 92].map((x, i) => (
+                <rect key={x} x={x - 5} y={15 + [8, 2, 12, 0, 10, 4, 9][i]} width="10"
+                  height={[20, 32, 16, 40, 18, 28, 22][i]} rx="5" fill="currentColor" />
               ))}
             </svg>
           </button>
@@ -943,9 +883,9 @@ export default function ChatbotPage() {
               transition: 'all 0.4s'
             }}>
               <svg width="40" height="40" viewBox="0 0 100 60">
-                {[8,22,36,50,64,78,92].map((x, i) => (
-                  <rect key={x} x={x-5} y={15 + [8,2,12,0,10,4,9][i]} width="10"
-                    height={(isListening || isSpeaking) ? [20,38,16,46,18,32,22][i] : [10,14,8,18,9,12,10][i]}
+                {[8, 22, 36, 50, 64, 78, 92].map((x, i) => (
+                  <rect key={x} x={x - 5} y={15 + [8, 2, 12, 0, 10, 4, 9][i]} width="10"
+                    height={(isListening || isSpeaking) ? [20, 38, 16, 46, 18, 32, 22][i] : [10, 14, 8, 18, 9, 12, 10][i]}
                     rx="5" fill="white"
                     style={{ animation: (isListening || isSpeaking) ? `waveBar 0.6s ease-in-out ${i * 0.1}s infinite alternate` : 'none', transition: 'height 0.3s, y 0.3s' }} />
                 ))}
@@ -956,7 +896,7 @@ export default function ChatbotPage() {
           {/* Waveform bars */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 28, height: 50 }}>
             {Array.from({ length: 30 }, (_, i) => {
-              const h = [.3,.6,.4,.8,.5,1,.45,.75,.35,.9,.55,.7,.4,.85,.5,.65,.35,.8,.45,.7,.3,.6,.5,.9,.4,.75,.55,.45,.38,.65][i];
+              const h = [.3, .6, .4, .8, .5, 1, .45, .75, .35, .9, .55, .7, .4, .85, .5, .65, .35, .8, .45, .7, .3, .6, .5, .9, .4, .75, .55, .45, .38, .65][i];
               return (
                 <div key={i} style={{
                   width: 3, borderRadius: 2,

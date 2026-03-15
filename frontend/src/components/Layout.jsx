@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI } from '../services/api';
@@ -7,13 +7,18 @@ import { dashboardAPI } from '../services/api';
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const searchRef = useRef(null);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   // Close search on outside click
   useEffect(() => {
@@ -47,6 +52,7 @@ export default function Layout() {
     { name: 'Disease Detection', path: '/disease-detection', keywords: 'disease detect plant leaf' },
     { name: 'Weather Advisory', path: '/weather', keywords: 'weather forecast rain' },
     { name: 'Market Prices', path: '/market', keywords: 'market price mandi msp' },
+    { name: 'Govt Policies', path: '/gov-policies', keywords: 'government policy scheme pm-kisan pmfby subsidy' },
     { name: 'Community Forum', path: '/community', keywords: 'community forum discuss' },
     { name: 'History', path: '/history', keywords: 'history past search' },
     { name: 'My Profile', path: '/profile', keywords: 'profile account settings' },
@@ -70,19 +76,35 @@ export default function Layout() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar />
+      {/* Mobile sidebar overlay */}
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="main-content" style={{
         flex: 1, marginLeft: 240, minHeight: '100vh',
         background: 'var(--bg-body)', display: 'flex', flexDirection: 'column'
       }}>
         {/* ─── Top Bar ─── */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 16,
-          padding: '10px 28px', background: 'white', borderBottom: '1px solid var(--border-light)',
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 20px', background: 'white', borderBottom: '1px solid var(--border-light)',
           position: 'sticky', top: 0, zIndex: 50
         }}>
+          {/* Hamburger button — visible only on mobile */}
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2d7a3a" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+
           {/* Search — at the left */}
-          <div ref={searchRef} style={{ position: 'relative', width: 360 }}>
+          <div ref={searchRef} style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '8px 14px', border: '1px solid var(--border)',
@@ -121,7 +143,7 @@ export default function Layout() {
             style={{
               width: 38, height: 38, borderRadius: '50%', border: '1px solid var(--border)',
               background: 'white', cursor: 'pointer', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', position: 'relative'
+              alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0
             }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4a6a4a" strokeWidth="2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -141,14 +163,14 @@ export default function Layout() {
               width: 38, height: 38, borderRadius: '50%',
               background: 'var(--gradient-primary)', border: 'none',
               color: 'white', fontWeight: 700, fontSize: 15,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
             }}>
             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
           </button>
         </div>
 
         {/* Page content */}
-        <div style={{ flex: 1, padding: '24px 28px' }}>
+        <div style={{ flex: 1, padding: '20px 20px' }}>
           <Outlet />
         </div>
       </main>

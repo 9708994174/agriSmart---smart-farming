@@ -100,7 +100,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Feature Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+      <div className="dash-feature-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
         {featureCards.map(card => (
           <div key={card.title} onClick={() => navigate(card.path)}
             style={{
@@ -131,14 +131,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats + Weather Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
+      <div className="dash-stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
         {/* Activity Summary */}
         <div className="card">
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
             Activity Summary
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
             {[
               { label: 'Chat Queries', value: stats?.total_chats || 0 },
               { label: 'Crop Predictions', value: stats?.crop_predictions || 0 },
@@ -174,7 +174,7 @@ export default function DashboardPage() {
                   <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{weather.city}{weather.state ? `, ${weather.state}` : ''}</p>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {[
                   { label: 'Humidity', value: `${weather.humidity}%` },
                   { label: 'Wind', value: `${weather.wind_speed} km/h` },
@@ -200,7 +200,7 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: '#1a2e1a' }}>Quick Actions</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+      <div className="dash-quick-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
         {quickActions.map(a => (
           <div key={a.label} className="card card-hover" onClick={() => navigate(a.path)}
             style={{

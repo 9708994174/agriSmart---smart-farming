@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/Toast';
 import AuthLayout from '../components/AuthLayout';
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,9 +44,12 @@ export default function RegisterPage() {
         location: { state: form.state, district: '', city: form.city },
         farm_details: { farm_size: '', farm_size_unit: 'acres', crops: [], soil_type: form.soil_type, irrigation_type: '' },
       });
+      toast.success('Account created successfully! Welcome aboard.');
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Try again.');
+      const msg = err.response?.data?.detail || 'Registration failed. Try again.';
+      setError(msg);
+      toast.error(msg);
     } finally { setLoading(false); }
   };
 
@@ -142,7 +147,7 @@ export default function RegisterPage() {
               }}>2</div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={labelStyle}>Phone</label>
                 <div style={{ display: 'flex', gap: 0 }}>
@@ -159,7 +164,6 @@ export default function RegisterPage() {
                 <label style={labelStyle}>Role</label>
                 <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.role} onChange={set('role')}>
                   <option value="farmer">Farmer</option>
-                  <option value="admin">Admin</option>
                 </select>
               </div>
             </div>

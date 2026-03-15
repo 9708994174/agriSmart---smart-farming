@@ -492,6 +492,113 @@ async def get_weather(city: str) -> dict:
     return weather_data
 
 
+async def get_weather_by_coords(lat: float, lon: float) -> dict:
+    """Get weather by lat/lon coordinates (from browser geolocation).
+    Uses reverse geocoding to find nearest city name."""
+    
+    # Try reverse geocoding to get city name
+    city_name = "Your Location"
+    state_name = ""
+    timezone = "auto"
+    
+    # Check if coordinates match any known Indian city (within ~25km)
+    for key, c in INDIAN_CITIES.items():
+        dlat = abs(c["lat"] - lat)
+        dlon = abs(c["lon"] - lon)
+        if dlat < 0.25 and dlon < 0.25:  # ~25km radius
+            city_name = c["name"]
+            state_name = c["state"]
+            timezone = c["tz"]
+            # Check cache with matched city name
+            cached = _get_cache(_weather_cache, city_name, _WEATHER_TTL)
+            if cached:
+                return cached
+            break
+    
+    # Try Open-Meteo reverse geocoding if no built-in match
+    if city_name == "Your Location":
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(
+                    "https://nominatim.openstreetmap.org/reverse",
+                    params={"lat": lat, "lon": lon, "format": "json", "zoom": 10},
+                    headers={"User-Agent": "AgriSmart-Weather/1.0"}
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    addr = data.get("address", {})
+                    city_name = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("county") or "Your Location"
+                    state_name = addr.get("state", "")
+        except Exception as e:
+            print(f"[WARN] Reverse geocoding failed: {e}")
+
+    params = {
+        "latitude"    : lat,
+        "longitude"   : lon,
+        "current"     : "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
+        "daily"       : "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,rain_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max",
+        "timezone"    : timezone,
+        "forecast_days": 1,
+    }
+
+    data = await _fetch_with_backoff(FORECAST_URL, params)
+    if data is None:
+        return {"error": True, "msg": "Weather service unavailable. Please try again."}
+
+    current = data.get("current", {})
+    daily   = data.get("daily", {})
+    wmo     = _get_wmo_info(current.get("weather_code", 0))
+
+    temp        = round(current.get("temperature_2m", 0), 1)
+    humidity    = current.get("relative_humidity_2m", 0)
+    wind_speed  = round(current.get("wind_speed_10m", 0), 1)
+    rain        = current.get("rain", 0) or 0
+    uv_index    = (daily.get("uv_index_max") or [0])[0]
+    precip_prob = (daily.get("precipitation_probability_max") or [0])[0]
+
+    weather_data = {
+        "city"         : city_name,
+        "country"      : "IN",
+        "state"        : state_name,
+        "latitude"     : lat,
+        "longitude"    : lon,
+        "temperature"  : temp,
+        "feels_like"   : round(current.get("apparent_temperature", temp), 1),
+        "temp_min"     : round((daily.get("temperature_2m_min") or [temp])[0], 1),
+        "temp_max"     : round((daily.get("temperature_2m_max") or [temp])[0], 1),
+        "humidity"     : humidity,
+        "pressure"     : round(current.get("pressure_msl", 1013)),
+        "description"  : wmo["description"],
+        "icon"         : wmo["icon"],
+        "weather_code" : current.get("weather_code", 0),
+        "is_day"       : current.get("is_day", 1),
+        "wind_speed"   : wind_speed,
+        "wind_direction": current.get("wind_direction_10m", 0),
+        "wind_gusts"   : round(current.get("wind_gusts_10m", 0), 1),
+        "clouds"       : current.get("cloud_cover", 0),
+        "rain"         : rain,
+        "precipitation": current.get("precipitation", 0),
+        "sunrise"      : (daily.get("sunrise") or [""])[0],
+        "sunset"       : (daily.get("sunset")  or [""])[0],
+        "uv_index"     : uv_index,
+        "precip_prob"  : precip_prob,
+        "data_source"  : "Open-Meteo (free, no API key)",
+        "cached_at"    : int(time.time()),
+    }
+
+    weather_data["farming_advisory"] = generate_farming_advice(
+        temp, humidity, wind_speed, wmo["description"], rain, uv_index, precip_prob
+    )
+    weather_data["farming_advice"] = (
+        weather_data["farming_advisory"]["warnings"] +
+        weather_data["farming_advisory"]["tips"]
+    )
+
+    if city_name != "Your Location":
+        _set_cache(_weather_cache, city_name, weather_data)
+    return weather_data
+
+
 async def get_forecast(city: str) -> dict:
     """Get 7-day forecast — cached for 30 min per city."""
 

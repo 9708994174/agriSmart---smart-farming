@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { predictAPI } from '../services/api';
+import { useToast } from '../components/Toast';
 
 export default function DiseaseDetectionPage() {
   const [file, setFile] = useState(null);
@@ -9,6 +10,7 @@ export default function DiseaseDetectionPage() {
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef(null);
+  const toast = useToast();
 
   const handleFile = (f) => {
     if (!f) return;
@@ -28,9 +30,12 @@ export default function DiseaseDetectionPage() {
     try {
       const res = await predictAPI.diseaseDetection(file);
       setResult(res.data);
+      toast.success('Analysis complete!');
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setError(detail || `Analysis failed (${err.response?.status || 'network error'}). Please try a different image.`);
+      const msg = detail || `Analysis failed (${err.response?.status || 'network error'}). Please try a different image.`;
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -46,7 +51,7 @@ export default function DiseaseDetectionPage() {
         <p>Upload a plant leaf photo — our system analyzes color, texture and lesion patterns for diagnosis</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: result ? '1fr 1fr' : '1fr', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: result ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr', gap: 24 }}>
         {/* ── Upload Panel ── */}
         <div className="card" style={{ padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

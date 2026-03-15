@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
+import { useToast } from '../components/Toast';
 
 const STATES = ['Andhra Pradesh', 'Bihar', 'Chhattisgarh', 'Gujarat', 'Haryana', 'Jharkhand',
     'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Odisha', 'Punjab',
@@ -12,6 +13,7 @@ export default function ProfilePage() {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
+    const toast = useToast();
     const [form, setForm] = useState({
         name: user?.name || '',
         phone: user?.phone || '',
@@ -36,9 +38,12 @@ export default function ProfilePage() {
             await authAPI.updateProfile(form);
             updateUser(form);
             setSuccess('Profile updated successfully!');
+            toast.success('Profile updated successfully!');
             setEditing(false);
         } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to update profile.');
+            const msg = err.response?.data?.detail || 'Failed to update profile.';
+            setError(msg);
+            toast.error(msg);
         } finally { setLoading(false); }
     };
 
