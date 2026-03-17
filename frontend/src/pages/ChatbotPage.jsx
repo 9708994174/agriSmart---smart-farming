@@ -496,22 +496,42 @@ export default function ChatbotPage() {
         display: 'flex', flexDirection: 'column', gap: 12
       }}>
         {messages.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 0' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🌾</div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>AgriSmart AI Assistant</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 420, margin: '0 auto 20px' }}>
+          <div style={{ textAlign: 'center', padding: '24px 0 8px' }}>
+            <div style={{ fontSize: 44, marginBottom: 10 }}>🌾</div>
+            <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>AgriSmart AI Assistant</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 340, margin: '0 auto 16px', lineHeight: 1.5 }}>
               Your AI farming expert — ask about crops, weather, diseases, schemes & more.
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', maxWidth: 500, margin: '0 auto' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 8,
+              maxWidth: 420,
+              margin: '0 auto',
+              padding: '0 4px'
+            }}>
               {suggestions.map((s) => (
                 <button key={s.text} onClick={() => sendMessage(s.text)} style={{
-                  padding: '8px 14px', borderRadius: 20, border: '1px solid var(--border)',
-                  background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                  display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s'
+                  padding: '10px 10px',
+                  borderRadius: 14,
+                  border: '1.5px solid var(--border)',
+                  background: 'white',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: 4,
+                  textAlign: 'left',
+                  transition: 'all 0.15s',
+                  lineHeight: 1.4,
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
                 }}
                   onMouseEnter={e => { e.currentTarget.style.background = '#e8f5e9'; e.currentTarget.style.borderColor = '#2d7a3a'; }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = 'var(--border)'; }}>
-                  {s.emoji} {s.text}
+                  <span style={{ fontSize: 18 }}>{s.emoji}</span>
+                  <span>{s.text}</span>
                 </button>
               ))}
             </div>
@@ -610,12 +630,18 @@ export default function ChatbotPage() {
 
       {/* Suggestion Chips */}
       {messages.length > 0 && messages[messages.length - 1]?.suggestions && (
-        <div style={{ display: 'flex', gap: 6, padding: '6px 0', flexWrap: 'wrap' }}>
+        <div style={{
+          display: 'flex', gap: 6, padding: '6px 0',
+          overflowX: 'auto', flexWrap: 'nowrap',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
+        }}>
           {messages[messages.length - 1].suggestions.map((s, i) => (
             <button key={i} onClick={() => sendMessage(s)} style={{
-              padding: '5px 12px', borderRadius: 16, border: '1px solid var(--border)',
+              padding: '6px 14px', borderRadius: 16, border: '1px solid var(--border)',
               background: 'white', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-              transition: 'all 0.15s'
+              transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0
             }}
               onMouseEnter={e => { e.currentTarget.style.background = '#e8f5e9'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'white'; }}>
