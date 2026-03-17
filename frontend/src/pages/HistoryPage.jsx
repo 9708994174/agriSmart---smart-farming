@@ -143,7 +143,7 @@ export default function HistoryPage() {
   const activeStar = fbHover || fbRating;
 
   return (
-    <div className="animate-fadeIn">
+    <div className="animate-fadeIn" style={{ overflowX: 'hidden', maxWidth: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
         <div>
@@ -207,52 +207,50 @@ export default function HistoryPage() {
             const meta = TYPE_META[item.type] || { icon: '📋', color: '#7a9a7a', label: 'Activity' };
             return (
               <div key={item._id || i} style={{
-                padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 14px', display: 'flex', gap: 10,
                 borderBottom: i < history.length - 1 ? '1px solid var(--border-light)' : 'none',
-                transition: 'background 0.15s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'}
-                onMouseLeave={e => e.currentTarget.style.background = ''}>
+                flexWrap: 'wrap', alignItems: 'flex-start',
+              }}>
 
                 {/* Icon */}
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  width: 34, height: 34, borderRadius: 8, flexShrink: 0,
                   background: `${meta.color}12`, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: 17,
+                  justifyContent: 'center', fontSize: 16,
                 }}>{meta.icon}</div>
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{
                     fontSize: 13, fontWeight: 500, color: '#1a2e1a',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0,
+                    wordBreak: 'break-word', lineHeight: 1.4, margin: 0,
                   }}>
                     {item.query}
                   </p>
-                  {/* Real date + time */}
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                    🕐 {formatDateTime(item.timestamp)}
-                    {item.timestamp && <span style={{ marginLeft: 6, opacity: 0.7 }}>({timeAgo(item.timestamp)})</span>}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{
+                      padding: '2px 7px', borderRadius: 5, fontSize: 10, fontWeight: 600,
+                      background: `${meta.color}12`, color: meta.color,
+                    }}>{meta.label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      🕐 {formatDateTime(item.timestamp)}
+                    </span>
+                    {item.timestamp && <span style={{ fontSize: 10, color: '#aaa' }}>({timeAgo(item.timestamp)})</span>}
+                  </div>
                 </div>
 
-                {/* Badge + delete */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <span style={{
-                    padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                    background: `${meta.color}12`, color: meta.color,
-                  }}>{meta.label}</span>
-                  <button
-                    onClick={() => deleteItem(item._id)}
-                    disabled={deleting === item._id}
-                    style={{
-                      width: 28, height: 28, borderRadius: 6, border: 'none',
-                      background: '#fef2f2', color: '#e53935', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 13, transition: 'all 0.15s', opacity: deleting === item._id ? 0.5 : 1,
-                    }}
-                    title="Delete this item">🗑</button>
-                </div>
+                {/* Delete */}
+                <button
+                  onClick={() => deleteItem(item._id)}
+                  disabled={deleting === item._id}
+                  style={{
+                    width: 28, height: 28, borderRadius: 6, border: 'none',
+                    background: '#fef2f2', color: '#e53935', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13, flexShrink: 0, opacity: deleting === item._id ? 0.5 : 1,
+                    touchAction: 'manipulation',
+                  }}
+                  title="Delete">🗑</button>
               </div>
             );
           })}

@@ -65,6 +65,11 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   background: var(--bg-body);
@@ -931,18 +936,21 @@ tr:hover td { background: var(--primary-50); }
 }
 
 /* ── Mobile overlay backdrop ── */
+/* Sidebar overlay — must NEVER block touches when hidden */
 .sidebar-overlay {
   display: none;
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
-  z-index: 99;
+  z-index: 199;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.3s;
 }
 .sidebar-overlay.visible {
   display: block;
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* ── Tablet: ≤1024px ── */
@@ -967,9 +975,15 @@ tr:hover td { background: var(--primary-50); }
   }
   .sidebar.open { transform: translateX(0); }
   .sidebar-close-btn { display: flex !important; }
-  .sidebar-overlay { display: block; }
+  /* Only show overlay when sidebar is actually open (via .visible class) */
+  .sidebar-overlay.visible { display: block; pointer-events: auto; }
 
   .main-content { margin-left: 0 !important; }
+
+  /* Topbar: search stretches full width on mobile, no spacer */
+  .topbar-spacer { display: none !important; }
+  .topbar-search { max-width: none !important; }
+  .topbar-container { padding: 8px 10px !important; gap: 6px !important; }
 
   /* Layout padding */
   .container { padding: 0 12px; }
@@ -1065,12 +1079,12 @@ tr:hover td { background: var(--primary-50); }
   .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
-/* ── Main content sidebar offset (desktop) ── */
+/* ── Main content sidebar offset (desktop) — must match sidebar width exactly ── */
 @media (min-width: 769px) {
   .main-content { margin-left: 240px; }
 }
-@media (min-width: 1025px) {
-  .main-content { margin-left: 260px; }
+@media (min-width: 769px) and (max-width: 1024px) {
+  .main-content { margin-left: 220px; }
 }
 
 /* ── Page content padding ── */
@@ -1086,13 +1100,25 @@ tr:hover td { background: var(--primary-50); }
   .main-content { margin-left: 220px; }
 }
 
+/* ── Desktop: limit search width ── */
+@media (min-width: 769px) {
+  .topbar-search { max-width: 360px; }
+}
+
 /* ── Table scroll: prevent page from scrolling on mobile, only table ── */
 .admin-table-wrap,
 .farmers-table-wrap,
 .crop-table-wrap,
 .disease-table-wrap,
-.market-table-wrap {
+.market-table-wrap,
+.table-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   max-width: 100%;
+}
+
+/* ── Slide-in animation for drawers ── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
 }

@@ -92,13 +92,13 @@ export default function Layout() {
       />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="main-content" style={{
-        flex: 1, minHeight: '100vh',
+        flex: 1, minHeight: '100vh', overflowX: 'hidden',
         background: 'var(--bg-body)', display: 'flex', flexDirection: 'column'
       }}>
         {/* ─── Top Bar ─── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '10px 20px', background: 'white', borderBottom: '1px solid var(--border-light)',
+        <div className="topbar-container" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 16px', background: 'white', borderBottom: '1px solid var(--border-light)',
           position: 'sticky', top: 0, zIndex: 50
         }}>
           {/* Hamburger button — visible only on mobile */}
@@ -112,19 +112,19 @@ export default function Layout() {
             </svg>
           </button>
 
-          {/* Search — at the left */}
-          <div ref={searchRef} style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+          {/* Search — clean, borderless */}
+          <div ref={searchRef} className="topbar-search" style={{ position: 'relative', flex: 1, minWidth: 0 }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 14px', border: '1px solid var(--border)',
-              borderRadius: 10, background: 'var(--bg-input)'
+              padding: '8px 12px', border: 'none',
+              borderRadius: 10, background: 'transparent'
             }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a9a7a" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a9a7a" strokeWidth="2" style={{ flexShrink: 0 }}>
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
               </svg>
               <input value={searchQuery} onChange={e => handleSearch(e.target.value)}
                 placeholder="Search features..."
-                style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, width: '100%', fontFamily: 'Inter' }} />
+                style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, width: '100%', fontFamily: 'Inter', minWidth: 0, color: '#333' }} />
             </div>
             {showSearch && searchResults.length > 0 && (
               <div style={{
@@ -145,7 +145,8 @@ export default function Layout() {
             )}
           </div>
 
-          <div style={{ flex: 1 }} />
+          {/* Spacer — only on desktop */}
+          <div className="topbar-spacer" style={{ flex: 1 }} />
 
           {/* Notification button */}
           <button
@@ -185,167 +186,221 @@ export default function Layout() {
               color: 'white', fontWeight: 700, fontSize: 15,
               cursor: 'pointer', display: 'flex', alignItems: 'center',
               justifyContent: 'center', flexShrink: 0,
-              touchAction: 'manipulation',  /* eliminates 300ms mobile tap delay */
+              touchAction: 'manipulation',
             }}>
             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
           </button>
         </div>
 
-        {/* Page content */}
-        <div style={{ flex: 1, padding: '16px' }}>
+        {/* Page content — overflow hidden prevents tables from widening the entire page */}
+        <div style={{ flex: 1, padding: '16px', overflowX: 'hidden', maxWidth: '100%' }}>
           <Outlet />
         </div>
       </main>
 
       {/* ─── NOTIFICATION SIDEBAR ─── */}
-      {showNotifPanel && <div onClick={() => setShowNotifPanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 499 }} />}
-      <div className="notif-panel-drawer" style={{
-        position: 'fixed', top: 0, right: showNotifPanel ? 0 : '-100%', width: 'min(400px, 100vw)',
-        height: '100vh', background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-        zIndex: 500, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
-      }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700 }}>Notifications</h2>
-          <button
+      {/* ─── NOTIFICATION SIDEBAR ─── */}
+      {showNotifPanel && (
+        <>
+          {/* Backdrop */}
+          <div
             onClick={() => setShowNotifPanel(false)}
+            onTouchEnd={(e) => { e.preventDefault(); setShowNotifPanel(false); }}
             style={{
-              width: 40, height: 40, borderRadius: 10,
-              border: '1px solid #eee', background: '#f9f9f9',
-              cursor: 'pointer', fontSize: 20, color: '#555',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, touchAction: 'manipulation',
-            }}>×</button>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {notifications.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#999', fontSize: 14 }}>No recent notifications</div>
-          ) : notifications.map(n => (
-            <div key={n.id} style={{
-              padding: '16px 24px', borderBottom: '1px solid #f5f5f5', display: 'flex', gap: 14, alignItems: 'flex-start',
-              transition: 'background 0.15s', cursor: 'pointer'
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+              zIndex: 999, touchAction: 'none',
             }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f8faf8'}
-              onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10, background: '#f0f5f0',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2d7a3a" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-                </svg>
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13, fontWeight: 500, color: '#1a2e1a', marginBottom: 4, lineHeight: 1.4 }}>{n.text}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f0f5f0', fontSize: 10, fontWeight: 600, color: '#2d7a3a' }}>
-                    {typeLabels[n.type] || 'Activity'}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#999' }}>{n.time}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div onClick={() => { navigate('/history'); setShowNotifPanel(false); }}
-          style={{
-            padding: '14px 24px', borderTop: '1px solid #eee', textAlign: 'center',
-            fontSize: 13, color: '#2d7a3a', fontWeight: 600, cursor: 'pointer'
+          />
+          {/* Panel */}
+          <div style={{
+            position: 'fixed', top: 0, right: 0,
+            width: 'min(400px, 100vw)', height: '100vh',
+            background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
+            zIndex: 1000, display: 'flex', flexDirection: 'column',
+            animation: 'slideInRight 0.25s ease',
           }}>
-          View All History →
-        </div>
-      </div>
+            {/* Header */}
+            <div style={{
+              padding: '14px 16px', borderBottom: '1px solid #eee',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'white', flexShrink: 0,
+            }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Notifications</h2>
+              <button
+                type="button"
+                onClick={() => setShowNotifPanel(false)}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setShowNotifPanel(false); }}
+                style={{
+                  width: 44, height: 44, borderRadius: 10,
+                  border: '2px solid #d1d5db', background: '#f3f4f6',
+                  cursor: 'pointer', fontSize: 24, color: '#374151',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, touchAction: 'manipulation', lineHeight: 1, padding: 0,
+                  WebkitTapHighlightColor: 'rgba(0,0,0,0.1)',
+                }}>✕</button>
+            </div>
+
+            {/* Items */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {notifications.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#999', fontSize: 14 }}>No recent notifications</div>
+              ) : notifications.map(n => (
+                <div key={n.id} style={{
+                  padding: '14px 20px', borderBottom: '1px solid #f5f5f5', display: 'flex', gap: 12, alignItems: 'flex-start',
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, background: '#f0f5f0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2d7a3a" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: '#1a2e1a', marginBottom: 4, lineHeight: 1.4 }}>{n.text}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, background: '#f0f5f0', fontSize: 10, fontWeight: 600, color: '#2d7a3a' }}>
+                        {typeLabels[n.type] || 'Activity'}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#999' }}>{n.time}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div
+              onClick={() => { navigate('/history'); setShowNotifPanel(false); }}
+              onTouchEnd={(e) => { e.preventDefault(); navigate('/history'); setShowNotifPanel(false); }}
+              style={{
+                padding: '14px 20px', borderTop: '1px solid #eee', textAlign: 'center',
+                fontSize: 13, color: '#2d7a3a', fontWeight: 600, cursor: 'pointer',
+                flexShrink: 0, touchAction: 'manipulation',
+              }}>
+              View All History →
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ─── PROFILE SIDEBAR ─── */}
-      {showProfilePanel && <div onClick={() => setShowProfilePanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 499 }} />}
-      <div className="profile-panel-drawer" style={{
-        position: 'fixed', top: 0, right: showProfilePanel ? 0 : '-100%', width: 'min(380px, 100vw)',
-        height: '100vh', background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-        zIndex: 500, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
-      }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700 }}>My Profile</h2>
-          <button
+      {showProfilePanel && (
+        <>
+          {/* Backdrop — closes panel on tap */}
+          <div
             onClick={() => setShowProfilePanel(false)}
+            onTouchEnd={(e) => { e.preventDefault(); setShowProfilePanel(false); }}
             style={{
-              width: 44, height: 44, borderRadius: 10,
-              border: '1.5px solid #e5e7eb', background: '#f9fafb',
-              cursor: 'pointer', fontSize: 22, color: '#374151', fontWeight: 300,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, touchAction: 'manipulation', lineHeight: 1,
-            }}>×</button>
-        </div>
-        <div style={{ padding: 24 }}>
-          {/* Avatar + info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
-            <div style={{
-              width: 60, height: 60, borderRadius: '50%', background: 'var(--gradient-primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 24, fontWeight: 700, color: 'white'
-            }}>
-              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
-            <div>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1a2e1a' }}>{user?.name || 'User'}</h3>
-              <p style={{ fontSize: 13, color: '#999', marginTop: 2 }}>{user?.email}</p>
-              <span style={{
-                display: 'inline-block', marginTop: 4, padding: '3px 10px',
-                borderRadius: 6, background: '#e8f5e9', color: '#2d7a3a',
-                fontSize: 11, fontWeight: 600, textTransform: 'capitalize'
-              }}>{user?.role}</span>
-            </div>
-          </div>
-
-          {/* Quick Info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {[
-              { label: 'Location', value: [user?.location?.city, user?.location?.state].filter(Boolean).join(', ') || 'Not set' },
-              { label: 'Language', value: { en: 'English', hi: 'Hindi', pa: 'Punjabi', mr: 'Marathi', ta: 'Tamil' }[user?.language] || 'English' },
-              { label: 'Soil Type', value: user?.farm_details?.soil_type || 'Not set' },
-            ].map(r => (
-              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f5f5f5' }}>
-                <span style={{ fontSize: 13, color: '#666' }}>{r.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#1a2e1a' }}>{r.value}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 28 }}>
-            {[
-              { label: 'My Profile', path: '/profile', icon: '→' },
-              { label: 'Activity History', path: '/history', icon: '→' },
-              ...(user?.role === 'admin' ? [{ label: 'Admin Panel', path: '/admin', icon: '→' }] : []),
-            ].map(a => (
-              <button key={a.label}
-                onClick={() => { navigate(a.path); setShowProfilePanel(false); }}
-                style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '12px 16px', borderRadius: 10, border: '1px solid #eee',
-                  background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 500,
-                  transition: 'background 0.15s', width: '100%', textAlign: 'left'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8faf8'}
-                onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                {a.label}
-                <span style={{ color: '#999' }}>{a.icon}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div style={{ marginTop: 'auto', padding: '16px 24px', borderTop: '1px solid #eee' }}>
-          <button onClick={() => { logout(); navigate('/'); }}
-            style={{
-              width: '100%', padding: '12px 16px', borderRadius: 10,
-              border: '1px solid #fecaca', background: '#fef2f2',
-              color: '#dc2626', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              transition: 'background 0.15s'
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+              zIndex: 999, touchAction: 'none',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-            onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}>
-            Sign Out
-          </button>
-        </div>
-      </div>
+          />
+          {/* Panel */}
+          <div style={{
+            position: 'fixed', top: 0, right: 0,
+            width: 'min(380px, 100vw)', height: '100vh',
+            background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
+            zIndex: 1000, display: 'flex', flexDirection: 'column',
+            animation: 'slideInRight 0.25s ease',
+          }}>
+            {/* Header with close button */}
+            <div style={{
+              padding: '14px 16px', borderBottom: '1px solid #eee',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              background: 'white', flexShrink: 0,
+            }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>My Profile</h2>
+              <button
+                type="button"
+                onClick={() => setShowProfilePanel(false)}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setShowProfilePanel(false); }}
+                style={{
+                  width: 44, height: 44, borderRadius: 10,
+                  border: '2px solid #d1d5db', background: '#f3f4f6',
+                  cursor: 'pointer', fontSize: 24, color: '#374151',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, touchAction: 'manipulation', lineHeight: 1, padding: 0,
+                  WebkitTapHighlightColor: 'rgba(0,0,0,0.1)',
+                }}>✕</button>
+            </div>
+
+            {/* Scrollable content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px' }}>
+              {/* Avatar + info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: '50%', background: 'var(--gradient-primary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 22, fontWeight: 700, color: 'white', flexShrink: 0,
+                }}>
+                  {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1a2e1a', margin: 0 }}>{user?.name || 'User'}</h3>
+                  <p style={{ fontSize: 12, color: '#999', marginTop: 3 }}>{user?.email}</p>
+                  <span style={{
+                    display: 'inline-block', marginTop: 4, padding: '3px 10px',
+                    borderRadius: 6, background: '#e8f5e9', color: '#2d7a3a',
+                    fontSize: 11, fontWeight: 600, textTransform: 'capitalize'
+                  }}>{user?.role}</span>
+                </div>
+              </div>
+
+              {/* Quick Info */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {[
+                  { label: 'Location', value: [user?.location?.city, user?.location?.state].filter(Boolean).join(', ') || 'Not set' },
+                  { label: 'Language', value: { en: 'English', hi: 'Hindi', pa: 'Punjabi', mr: 'Marathi', ta: 'Tamil' }[user?.language] || 'English' },
+                  { label: 'Soil Type', value: user?.farm_details?.soil_type || 'Not set' },
+                ].map(r => (
+                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f5f5f5' }}>
+                    <span style={{ fontSize: 13, color: '#666' }}>{r.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1a2e1a' }}>{r.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 28 }}>
+                {[
+                  { label: 'My Profile', path: '/profile', icon: '→' },
+                  { label: 'Activity History', path: '/history', icon: '→' },
+                  ...(user?.role === 'admin' ? [{ label: 'Admin Panel', path: '/admin', icon: '→' }] : []),
+                ].map(a => (
+                  <button key={a.label} type="button"
+                    onClick={() => { navigate(a.path); setShowProfilePanel(false); }}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '12px 16px', borderRadius: 10, border: '1px solid #eee',
+                      background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                      transition: 'background 0.15s', width: '100%', textAlign: 'left',
+                      touchAction: 'manipulation',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f8faf8'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                    {a.label}
+                    <span style={{ color: '#999' }}>{a.icon}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sign Out */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #eee', flexShrink: 0 }}>
+              <button type="button" onClick={() => { logout(); navigate('/'); }}
+                style={{
+                  width: '100%', padding: '12px 16px', borderRadius: 10,
+                  border: '1px solid #fecaca', background: '#fef2f2',
+                  color: '#dc2626', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                  touchAction: 'manipulation',
+                }}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
     </div>
   );
