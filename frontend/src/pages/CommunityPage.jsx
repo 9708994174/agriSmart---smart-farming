@@ -101,17 +101,17 @@ export default function CommunityPage() {
                             onChange={e => setNewPost(e.target.value)}
                             style={{ width: '100%', minHeight: 80, resize: 'vertical' }}
                         />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, flexWrap: 'wrap', gap: 10 }}>
                             <input
                                 className="input-field"
-                                placeholder="Tags (comma separated): rice, fertilizer"
+                                placeholder="Tags: rice, fertilizer"
                                 value={newTags}
                                 onChange={e => setNewTags(e.target.value)}
-                                style={{ width: 300, fontSize: 12 }}
+                                style={{ flex: 1, minWidth: 0, fontSize: 12 }}
                             />
                             <button className="btn btn-primary btn-sm" disabled={!newPost.trim() || posting}
                                 onClick={handleCreatePost}>
-                                {posting ? 'Posting...' : 'Post Question'}
+                                {posting ? 'Posting...' : 'Post'}
                             </button>
                         </div>
                     </div>
@@ -148,7 +148,7 @@ export default function CommunityPage() {
                                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>· {timeAgo(post.created_at)}</span>
                                     </div>
                                     <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>{post.question}</p>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                                         <div style={{ display: 'flex', gap: 6 }}>
                                             {(post.tags || []).map(tag => (
                                                 <span key={tag} style={{

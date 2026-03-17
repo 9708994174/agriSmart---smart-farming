@@ -239,7 +239,7 @@ export default function AdminPage() {
   const renderDashboard = () => (
     <div className="animate-fadeIn">
       <SH title="Admin Dashboard" right={<Btn onClick={loadAll} small>↻ Refresh</Btn>} />
-      <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="admin-stats-grid" style={{ display: 'grid', gap: 14, marginBottom: 24 }}>
         <StatCard title="👨‍🌾 Total Farmers" value={stats.total_farmers || 0} sub={`+${stats.new_this_month || 0} this month`} color="#2d7a3a" />
         <StatCard title="💬 Chatbot Queries" value={stats.chatbot_queries_month || 0} sub={`${stats.today_queries || 0} today`} color="#1565c0" />
         <StatCard title="🌾 Crop Predictions" value={stats.total_predictions || 0} sub={`${stats.crop_predictions_today || 0} today`} color="#7b1fa2" />
@@ -314,7 +314,7 @@ export default function AdminPage() {
         </div>
       } />
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>{['ID', 'Name', 'Email', 'Phone', 'Location', 'Crops', 'Role', 'Actions'].map(h => <TH key={h}>{h}</TH>)}</tr></thead>
             <tbody>
@@ -359,20 +359,22 @@ export default function AdminPage() {
     <div className="animate-fadeIn">
       <SH title="🌾 Crop Dataset" right={<span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{CROPS.length} crops</span>} />
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Crop Name', 'Soil pH', 'Nitrogen Req.', 'Temperature', 'Water Need'].map(h => <TH key={h}>{h}</TH>)}</tr></thead>
-          <tbody>
-            {CROPS.map((c, i) => (
-              <tr key={i} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <TD style={{ fontWeight: 700, color: '#1a2e1a' }}>{c.name}</TD>
-                <TD>{c.ph}</TD>
-                <TD>{c.n}</TD>
-                <TD>{c.temp}</TD>
-                <TD><span className={`badge ${c.water === 'High' ? 'badge-error' : c.water === 'Low' ? 'badge-warning' : 'badge-success'}`}>{c.water}</span></TD>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>{['Crop Name', 'Soil pH', 'Nitrogen Req.', 'Temperature', 'Water Need'].map(h => <TH key={h}>{h}</TH>)}</tr></thead>
+            <tbody>
+              {CROPS.map((c, i) => (
+                <tr key={i} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
+                  <TD style={{ fontWeight: 700, color: '#1a2e1a' }}>{c.name}</TD>
+                  <TD>{c.ph}</TD>
+                  <TD>{c.n}</TD>
+                  <TD>{c.temp}</TD>
+                  <TD><span className={`badge ${c.water === 'High' ? 'badge-error' : c.water === 'Low' ? 'badge-warning' : 'badge-success'}`}>{c.water}</span></TD>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -381,19 +383,21 @@ export default function AdminPage() {
     <div className="animate-fadeIn">
       <SH title="🔬 Disease Dataset" right={<span style={{ fontSize: 13, color: 'var(--text-muted)' }}>PlantVillage — {DISEASES.length} classes</span>} />
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Disease Name', 'Affected Crop', 'Pathogen', 'Type'].map(h => <TH key={h}>{h}</TH>)}</tr></thead>
-          <tbody>
-            {DISEASES.map((d, i) => (
-              <tr key={i} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <TD style={{ fontWeight: 600, color: d.name.startsWith('Healthy') ? '#2d7a3a' : '#c62828' }}>{d.name}</TD>
-                <TD>{d.crop}</TD>
-                <TD style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: 12 }}>{d.pathogen}</TD>
-                <TD><span className={`badge ${d.type === 'Bacterial' ? 'badge-error' : d.type === 'Viral' ? 'badge-warning' : d.type === 'Mite' ? 'badge-warning' : 'badge-success'}`}>{d.type}</span></TD>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>{['Disease Name', 'Affected Crop', 'Pathogen', 'Type'].map(h => <TH key={h}>{h}</TH>)}</tr></thead>
+            <tbody>
+              {DISEASES.map((d, i) => (
+                <tr key={i} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
+                  <TD style={{ fontWeight: 600, color: d.name.startsWith('Healthy') ? '#2d7a3a' : '#c62828' }}>{d.name}</TD>
+                  <TD>{d.crop}</TD>
+                  <TD style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: 12 }}>{d.pathogen}</TD>
+                  <TD><span className={`badge ${d.type === 'Bacterial' ? 'badge-error' : d.type === 'Viral' ? 'badge-warning' : d.type === 'Mite' ? 'badge-warning' : 'badge-success'}`}>{d.type}</span></TD>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -445,7 +449,7 @@ export default function AdminPage() {
       ) : weatherData.error ? (
         <div className="alert alert-error">❌ {weatherData.msg || 'Could not fetch weather. Try another city name.'}</div>
       ) : (
-        <div className="admin-weather-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <div className="admin-weather-grid" style={{ display: 'grid', gap: 14 }}>
           <StatCard title="🌡️ Temperature" value={`${weatherData.temperature ?? '--'}°C`} sub={weatherData.description || ''} color="#e65100" />
           <StatCard title="💧 Humidity" value={`${weatherData.humidity ?? '--'}%`} sub={`Feels like ${weatherData.feels_like ?? '--'}°C`} color="#1565c0" />
           <StatCard title="🌬️ Wind Speed" value={`${weatherData.wind_speed ?? '--'} km/h`} sub={`${weatherData.city || weatherCity}${weatherData.state ? ', ' + weatherData.state : ''}`} color="#2d7a3a" />
@@ -475,7 +479,8 @@ export default function AdminPage() {
         <div className="alert alert-error">❌ Failed to fetch prices. Please try again.</div>
       ) : marketData.prices && Array.isArray(marketData.prices) ? (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>{['Market', 'State', 'Min (₹/qtl)', 'Max (₹/qtl)', 'Modal (₹/qtl)'].map(h => <TH key={h}>{h}</TH>)}</tr></thead>
             <tbody>
               {marketData.prices.slice(0, 15).map((p, i) => (
@@ -489,6 +494,7 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       ) : (
         <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Data: {JSON.stringify(marketData).slice(0, 200)}</p>
@@ -505,7 +511,7 @@ export default function AdminPage() {
         </div>
       } />
       {chatbotStats && (
-        <div className="admin-stats-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
+        <div className="admin-stats-3" style={{ display: 'grid', gap: 14, marginBottom: 16 }}>
           <StatCard title="📊 Queries (7 days)" value={chatbotStats.daily_queries?.reduce((s, d) => s + d.count, 0) || 0} color="#7b1fa2" />
           <StatCard title="🌐 Languages Used" value={chatbotStats.language_distribution?.length || 0} color="#1565c0" />
           <StatCard title="🔬 Disease Scans (7d)" value={chatbotStats.disease_daily?.reduce((s, d) => s + d.count, 0) || 0} color="#e65100" />
@@ -539,45 +545,157 @@ export default function AdminPage() {
     </div>
   );
 
-  const renderFeedback = () => (
-    <div className="animate-fadeIn">
-      <SH title="📋 Feedback & Reports" right={<span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{feedbackList.length} submissions</span>} />
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {feedbackList.length === 0 ? (
-          <p style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No feedback received yet.</p>
-        ) : feedbackList.map((fb, i) => (
-          <div key={i} style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'}
-            onMouseLeave={e => e.currentTarget.style.background = ''}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span className={`badge ${fb.type === 'bug' ? 'badge-error' : fb.type === 'suggestion' ? 'badge-info' : 'badge-success'}`} style={{ textTransform: 'uppercase', fontSize: 10 }}>
-                  {fb.type === 'bug' ? '🐞 Bug' : fb.type === 'suggestion' ? '💡 Suggestion' : '💬 Feedback'}
-                </span>
-                {fb.rating && <span style={{ fontSize: 13 }}>{'⭐'.repeat(fb.rating)}{'☆'.repeat(5 - fb.rating)}</span>}
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ago(fb.timestamp)}</span>
-              </div>
-              <Btn small danger onClick={() => deleteFeedback(fb._id)}>🗑 Delete</Btn>
+  const renderFeedback = () => {
+    // Real date+time formatter (IST-friendly)
+    const fmtDate = (ts) => {
+      if (!ts) return 'Unknown time';
+      try {
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return ts;
+        return d.toLocaleString('en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', hour12: true,
+        });
+      } catch { return ts; }
+    };
+
+    const TYPE_COLOR = { bug: '#e53935', suggestion: '#1565c0', praise: '#f59e0b', general: '#2d7a3a' };
+    const TYPE_ICON  = { bug: '🐞', suggestion: '💡', praise: '⭐', general: '💬' };
+    const TYPE_LABEL = { bug: 'Bug', suggestion: 'Suggestion', praise: 'Praise', general: 'General' };
+
+    // Star bar component
+    const StarBar = ({ rating }) => {
+      if (!rating) return <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No rating</span>;
+      const colors = ['', '#e53935', '#f5a623', '#f59e0b', '#4caf50', '#2d7a3a'];
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {[1,2,3,4,5].map(n => (
+            <span key={n} style={{
+              fontSize: 15,
+              color: n <= rating ? colors[rating] : '#d1d5db',
+              filter: n <= rating ? 'drop-shadow(0 0 2px rgba(0,0,0,0.15))' : 'none',
+            }}>
+              {n <= rating ? '★' : '☆'}
+            </span>
+          ))}
+          <span style={{
+            marginLeft: 4, fontSize: 11, fontWeight: 700,
+            color: colors[rating], background: `${colors[rating]}18`,
+            padding: '2px 6px', borderRadius: 6,
+          }}>
+            {rating}/5
+          </span>
+        </div>
+      );
+    };
+
+    return (
+      <div className="animate-fadeIn">
+        <SH title="📋 Feedback & Reports" right={
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            {feedbackList.length} submission{feedbackList.length !== 1 ? 's' : ''}
+          </span>
+        } />
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {feedbackList.length === 0 ? (
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <p style={{ fontSize: 36, marginBottom: 12 }}>📋</p>
+              <p style={{ fontSize: 14, fontWeight: 600 }}>No feedback received yet.</p>
+              <p style={{ fontSize: 12, marginTop: 6 }}>Submissions from users will appear here.</p>
             </div>
-            <p style={{ fontSize: 13, color: '#333', margin: 0, lineHeight: 1.6 }}>{fb.content}</p>
-            {fb.page && <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>📄 Page: {fb.page}</p>}
-          </div>
-        ))}
+          ) : feedbackList.map((fb, i) => {
+            const color = TYPE_COLOR[fb.type] || '#2d7a3a';
+            const icon  = TYPE_ICON[fb.type]  || '💬';
+            const label = TYPE_LABEL[fb.type] || 'Feedback';
+            // Use created_at if available (more accurate), fall back to timestamp
+            const displayTs = fb.created_at || fb.timestamp;
+
+            return (
+              <div key={fb._id || i}
+                style={{
+                  padding: '16px 20px',
+                  borderBottom: i < feedbackList.length - 1 ? '1px solid var(--border-light)' : 'none',
+                  borderLeft: `3px solid ${color}`,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}>
+
+                {/* Top row: badge · rating · time · delete */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Type badge */}
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      background: `${color}14`, color,
+                    }}>
+                      {icon} {label}
+                    </span>
+
+                    {/* Star rating */}
+                    <StarBar rating={fb.rating} />
+
+                    {/* Page tag */}
+                    {fb.page && (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 8px', borderRadius: 6 }}>
+                        📄 {fb.page}
+                      </span>
+                    )}
+                  </div>
+
+                  <Btn small danger onClick={() => deleteFeedback(fb._id)}>🗑 Delete</Btn>
+                </div>
+
+                {/* Feedback content */}
+                <p style={{ fontSize: 13, color: '#1a2e1a', margin: '0 0 10px', lineHeight: 1.65, fontStyle: 'italic' }}>
+                  "{fb.content}"
+                </p>
+
+                {/* Bottom row: user info + real timestamp */}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* User */}
+                  {(fb.user_name || fb.user_email) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{
+                        width: 24, height: 24, borderRadius: '50%', background: `${color}20`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, fontWeight: 700, color,
+                      }}>
+                        {(fb.user_name || fb.user_email || '?')[0].toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        {fb.user_name || fb.user_email}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Real date + time */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>🕐</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
+                      {fmtDate(displayTs)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderAnalytics = () => (
     <div className="animate-fadeIn">
       <SH title="📊 System Analytics" />
-      <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="admin-stats-grid" style={{ display: 'grid', gap: 14, marginBottom: 20 }}>
         <StatCard title="👥 Total Users" value={stats.total_users || 0} color="#1565c0" />
         <StatCard title="💬 Total Chats" value={stats.total_chats || 0} color="#7b1fa2" />
         <StatCard title="🌾 Total Predictions" value={stats.total_predictions || 0} color="#2d7a3a" />
         <StatCard title="🔬 Disease Detections" value={stats.total_disease_detections || 0} color="#e65100" />
       </div>
       {chatbotStats && (
-        <div className="admin-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="admin-2col" style={{ display: 'grid', gap: 18 }}>
           <div className="card">
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#1a2e1a' }}>📈 Daily Queries (7 days)</h3>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 130 }}>
@@ -625,7 +743,7 @@ export default function AdminPage() {
       <SH title="👤 My Profile" />
       {profSuccess && <div className="alert alert-success" style={{ marginBottom: 16 }}>✅ {profSuccess}</div>}
       {profError && <div className="alert alert-error" style={{ marginBottom: 16 }}>❌ {profError}</div>}
-      <div className="admin-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="admin-2col" style={{ display: 'grid', gap: 20 }}>
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700, color: 'white' }}>
@@ -675,7 +793,7 @@ export default function AdminPage() {
   const renderSettings = () => (
     <div className="animate-fadeIn">
       <SH title="⚙️ System Settings" right={<Btn onClick={saveSettings} primary>💾 Save Settings</Btn>} />
-      <div className="admin-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="admin-2col" style={{ display: 'grid', gap: 20 }}>
         <div className="card">
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🌐 General</h3>
           <div style={{ display: 'grid', gap: 14 }}>

@@ -57,7 +57,7 @@ export default function ProfilePage() {
             {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
             {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: 20 }}>
                 {/* Profile Info */}
                 <div className="card">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
@@ -128,7 +128,7 @@ export default function ProfilePage() {
                                 {STATES.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
                             <div className="input-group">
                                 <label>District</label>
                                 <input className="input-field" value={form.location.district}
@@ -142,7 +142,7 @@ export default function ProfilePage() {
                                     disabled={!editing} />
                             </div>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
                             <div className="input-group">
                                 <label>Farm Size</label>
                                 <input className="input-field" type="number" value={form.farm_details.farm_size}

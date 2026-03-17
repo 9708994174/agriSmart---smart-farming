@@ -83,7 +83,7 @@ export default function Layout() {
       />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <main className="main-content" style={{
-        flex: 1, marginLeft: 240, minHeight: '100vh',
+        flex: 1, minHeight: '100vh',
         background: 'var(--bg-body)', display: 'flex', flexDirection: 'column'
       }}>
         {/* ─── Top Bar ─── */}
@@ -170,15 +170,15 @@ export default function Layout() {
         </div>
 
         {/* Page content */}
-        <div style={{ flex: 1, padding: '20px 20px' }}>
+        <div style={{ flex: 1, padding: '16px' }}>
           <Outlet />
         </div>
       </main>
 
       {/* ─── NOTIFICATION SIDEBAR ─── */}
       {showNotifPanel && <div onClick={() => setShowNotifPanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} />}
-      <div style={{
-        position: 'fixed', top: 0, right: showNotifPanel ? 0 : -420, width: 400,
+      <div className="notif-panel-drawer" style={{
+        position: 'fixed', top: 0, right: showNotifPanel ? 0 : '-100%', width: 'min(400px, 100vw)',
         height: '100vh', background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
         zIndex: 201, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
       }}>
@@ -227,8 +227,8 @@ export default function Layout() {
 
       {/* ─── PROFILE SIDEBAR ─── */}
       {showProfilePanel && <div onClick={() => setShowProfilePanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} />}
-      <div style={{
-        position: 'fixed', top: 0, right: showProfilePanel ? 0 : -400, width: 380,
+      <div className="profile-panel-drawer" style={{
+        position: 'fixed', top: 0, right: showProfilePanel ? 0 : '-100%', width: 'min(380px, 100vw)',
         height: '100vh', background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
         zIndex: 201, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
       }}>

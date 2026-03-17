@@ -59,9 +59,9 @@ export default function CropRecommendationPage() {
         <p>Enter soil and climate parameters for AI-powered crop suggestions</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: result ? '1fr 1fr' : '1fr', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: 20 }}>
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
             {presets.map((p, i) => (
               <button key={i} className="btn btn-secondary btn-sm"
                 onClick={() => setForm(Object.fromEntries(Object.entries(p.values).map(([k, v]) => [k, String(v)])))}>

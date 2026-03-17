@@ -100,7 +100,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Feature Cards */}
-      <div className="dash-feature-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+      <div className="dash-feature-grid" style={{ display: 'grid', gap: 14, marginBottom: 24 }}>
         {featureCards.map(card => (
           <div key={card.title} onClick={() => navigate(card.path)}
             style={{
@@ -131,7 +131,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats + Weather Row */}
-      <div className="dash-stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
+      <div className="dash-stats-grid" style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
         {/* Activity Summary */}
         <div className="card">
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -200,7 +200,7 @@ export default function DashboardPage() {
 
       {/* Quick Actions */}
       <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: '#1a2e1a' }}>Quick Actions</h3>
-      <div className="dash-quick-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+      <div className="dash-quick-grid" style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
         {quickActions.map(a => (
           <div key={a.label} className="card card-hover" onClick={() => navigate(a.path)}
             style={{
