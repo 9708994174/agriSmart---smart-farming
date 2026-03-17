@@ -79,7 +79,8 @@ export default function LoginPage() {
           width: '100%', padding: 12, border: 'none', borderRadius: 10,
           background: isAdmin ? '#1a2e1a' : '#2d7a3a', color: 'white', fontSize: 15,
           fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.7 : 1, fontFamily: 'Inter'
+          opacity: loading ? 0.7 : 1, fontFamily: 'Inter',
+          touchAction: 'manipulation',  /* no 300ms ghost-click delay on mobile */
         }}>
           {loading ? 'Signing In...' : isAdmin ? 'Sign In as Admin' : 'Sign In'}
         </button>

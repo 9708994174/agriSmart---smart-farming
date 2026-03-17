@@ -225,7 +225,7 @@ export default function RegisterPage() {
                   color: 'white', fontSize: 15, fontWeight: 700,
                   cursor: loading ? 'not-allowed' : 'pointer',
                   fontFamily: 'Inter', boxShadow: '0 4px 12px rgba(45,122,58,0.3)',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s', touchAction: 'manipulation',
                 }}>
                 {loading ? 'Creating Account...' : 'Create Account'}
               </button>

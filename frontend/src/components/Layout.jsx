@@ -15,10 +15,19 @@ export default function Layout() {
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Guard: prevent ghost-click from opening panel right after navigation
+  const [panelGuard, setPanelGuard] = useState(false);
   const searchRef = useRef(null);
 
-  // Close sidebar on route change (mobile)
-  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
+  // Close sidebar on route change (mobile), and set a 500ms guard to block ghost-clicks
+  useEffect(() => {
+    setSidebarOpen(false);
+    setShowProfilePanel(false);
+    setShowNotifPanel(false);
+    setPanelGuard(true);
+    const t = setTimeout(() => setPanelGuard(false), 500);
+    return () => clearTimeout(t);
+  }, [location.pathname]);
 
   // Close search on outside click
   useEffect(() => {
@@ -139,11 +148,17 @@ export default function Layout() {
           <div style={{ flex: 1 }} />
 
           {/* Notification button */}
-          <button onClick={() => { setShowNotifPanel(!showNotifPanel); setShowProfilePanel(false); }}
+          <button
+            onClick={() => {
+              if (panelGuard) return;
+              setShowNotifPanel(!showNotifPanel);
+              setShowProfilePanel(false);
+            }}
             style={{
-              width: 38, height: 38, borderRadius: '50%', border: '1px solid var(--border)',
+              width: 40, height: 40, borderRadius: '50%', border: '1px solid var(--border)',
               background: 'white', cursor: 'pointer', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0
+              alignItems: 'center', justifyContent: 'center', position: 'relative',
+              flexShrink: 0, touchAction: 'manipulation',
             }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4a6a4a" strokeWidth="2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -158,12 +173,19 @@ export default function Layout() {
           </button>
 
           {/* Profile button */}
-          <button onClick={() => { setShowProfilePanel(!showProfilePanel); setShowNotifPanel(false); }}
+          <button
+            onClick={() => {
+              if (panelGuard) return;
+              setShowProfilePanel(!showProfilePanel);
+              setShowNotifPanel(false);
+            }}
             style={{
-              width: 38, height: 38, borderRadius: '50%',
+              width: 40, height: 40, borderRadius: '50%',
               background: 'var(--gradient-primary)', border: 'none',
               color: 'white', fontWeight: 700, fontSize: 15,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              cursor: 'pointer', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0,
+              touchAction: 'manipulation',  /* eliminates 300ms mobile tap delay */
             }}>
             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
           </button>
@@ -176,15 +198,23 @@ export default function Layout() {
       </main>
 
       {/* ─── NOTIFICATION SIDEBAR ─── */}
-      {showNotifPanel && <div onClick={() => setShowNotifPanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} />}
+      {showNotifPanel && <div onClick={() => setShowNotifPanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 499 }} />}
       <div className="notif-panel-drawer" style={{
         position: 'fixed', top: 0, right: showNotifPanel ? 0 : '-100%', width: 'min(400px, 100vw)',
         height: '100vh', background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-        zIndex: 201, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
+        zIndex: 500, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
       }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700 }}>Notifications</h2>
-          <button onClick={() => setShowNotifPanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#999' }}>×</button>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700 }}>Notifications</h2>
+          <button
+            onClick={() => setShowNotifPanel(false)}
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              border: '1px solid #eee', background: '#f9f9f9',
+              cursor: 'pointer', fontSize: 20, color: '#555',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, touchAction: 'manipulation',
+            }}>×</button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {notifications.length === 0 ? (
@@ -226,15 +256,23 @@ export default function Layout() {
       </div>
 
       {/* ─── PROFILE SIDEBAR ─── */}
-      {showProfilePanel && <div onClick={() => setShowProfilePanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 200 }} />}
+      {showProfilePanel && <div onClick={() => setShowProfilePanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 499 }} />}
       <div className="profile-panel-drawer" style={{
         position: 'fixed', top: 0, right: showProfilePanel ? 0 : '-100%', width: 'min(380px, 100vw)',
         height: '100vh', background: 'white', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-        zIndex: 201, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
+        zIndex: 500, transition: 'right 0.3s ease', display: 'flex', flexDirection: 'column'
       }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700 }}>Profile</h2>
-          <button onClick={() => setShowProfilePanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#999' }}>×</button>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700 }}>My Profile</h2>
+          <button
+            onClick={() => setShowProfilePanel(false)}
+            style={{
+              width: 44, height: 44, borderRadius: 10,
+              border: '1.5px solid #e5e7eb', background: '#f9fafb',
+              cursor: 'pointer', fontSize: 22, color: '#374151', fontWeight: 300,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, touchAction: 'manipulation', lineHeight: 1,
+            }}>×</button>
         </div>
         <div style={{ padding: 24 }}>
           {/* Avatar + info */}
