@@ -29,49 +29,49 @@ export default function AuthLayout({ children, title, subtitle, mode = 'login' }
   };
 
   return (
-    <div style={{
-      width: '100vw', minHeight: '100vh', display: 'flex',
-      overflow: 'hidden', background: '#ffffff'
+    <div className="auth-wrapper" style={{
+      width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'clamp(16px, 4vw, 40px)', background: '#f0fdf4', overflow: 'hidden', boxSizing: 'border-box'
     }}>
-      {/* Left panel — image (hidden on mobile) */}
-      <div className="auth-visual-panel" style={{
-        width: '50%', height: '100vh', flexShrink: 0,
-        position: 'relative', overflow: 'hidden'
+      <div style={{
+        display: 'flex', alignItems: 'stretch', width: '100%', maxWidth: 1100, height: '100%', maxHeight: 720,
+        background: '#ffffff', borderRadius: 28, overflow: 'hidden',
+        boxShadow: '0 24px 64px rgba(0,96,40,0.12), 0 8px 16px rgba(0,0,0,0.04)',
+        border: '1px solid rgba(0,96,40,0.1)',
       }}>
-        <img src="/images/auth_farm_scene.png" alt="Farm Scene"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-      </div>
+        {/* Left panel — image (hidden on mobile) */}
+        <div className="auth-visual-panel" style={{
+          width: '50%', flexShrink: 0, position: 'relative', overflow: 'hidden'
+        }}>
+          <img src="/images/auth_farm_scene.png" alt="Farm Scene"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </div>
 
-      {/* Right panel — form */}
-      <div className="auth-form-panel" style={{
-        width: '50%', height: '100vh',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '20px 48px', background: '#ffffff', overflowY: 'auto'
-      }}>
-        <div style={{ width: '100%', maxWidth: 440 }}>
+        {/* Right panel — form */}
+        <div className="auth-form-panel" style={{
+          width: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 'clamp(32px, 5vw, 64px)', background: '#ffffff', overflowY: 'auto'
+        }}>
+          <div style={{ width: '100%', maxWidth: 400 }}>
           {/* Header */}
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: 20, textAlign: 'center' }}>
             <h1 style={{
-              fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em',
+              fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em',
               color: '#1a2e1a', fontFamily: 'Outfit', lineHeight: 1.2
             }}>{title}</h1>
             {subtitle && (
-              <p style={{ marginTop: 6, fontSize: 14, color: '#6a8a6a', lineHeight: 1.4 }}>{subtitle}</p>
+              <p style={{ marginTop: 4, fontSize: 13, color: '#6a8a6a' }}>{subtitle}</p>
             )}
           </div>
 
-          {/* Form card */}
-          <div style={{
-            background: '#ffffff', border: '1.5px solid #d4e8d4',
-            borderRadius: 16, padding: 24,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
-          }}>
+          {/* Form Content */}
+          <div>
             {children}
           </div>
 
           {/* Divider */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 14, margin: '18px 0'
+            display: 'flex', alignItems: 'center', gap: 14, margin: '16px 0'
           }}>
             <div style={{ flex: 1, height: 1, background: '#e0e8e0' }} />
             <span style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>OR</span>
@@ -119,7 +119,7 @@ export default function AuthLayout({ children, title, subtitle, mode = 'login' }
           </button>
 
           {/* Switch */}
-          <p style={{ textAlign: 'center', marginTop: 18, fontSize: 13, color: '#6a8a6a' }}>
+          <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#6a8a6a' }}>
             {mode === 'login' ? (
               <>Don't have an account? <Link to="/register" style={{ color: '#2d7a3a', fontWeight: 700, textDecoration: 'none' }}>Sign Up</Link></>
             ) : (
@@ -131,14 +131,15 @@ export default function AuthLayout({ children, title, subtitle, mode = 'login' }
 
       {/* Responsive styles */}
       <style>{`
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
           .auth-visual-panel { display: none !important; }
           .auth-form-panel {
             width: 100% !important;
-            padding: 24px 20px !important;
+            padding: 40px 24px !important;
           }
         }
       `}</style>
     </div>
+  </div>
   );
 }

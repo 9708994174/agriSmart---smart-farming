@@ -3,266 +3,338 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { dashboardAPI, weatherAPI } from '../services/api';
 
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good Morning';
+  if (h < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
+
+function AnimatedNumber({ value, color = 'var(--primary)' }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (!value) return;
+    let cur = 0;
+    const step = Math.max(1, Math.ceil(value / 20));
+    const t = setInterval(() => {
+      cur += step;
+      if (cur >= value) { setDisplay(value); clearInterval(t); }
+      else setDisplay(cur);
+    }, 30);
+    return () => clearInterval(t);
+  }, [value]);
+  return <span style={{ color, fontVariantNumeric: 'tabular-nums' }}>{display}</span>;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [stats, setStats] = useState(null);
-  const [weather, setWeather] = useState(null);
+  const navigate  = useNavigate();
+  const [stats, setStats]           = useState(null);
+  const [weather, setWeather]       = useState(null);
   const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]       = useState(true);
+  const [geoCity, setGeoCity]       = useState('');
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [statsRes, actRes] = await Promise.all([
-          dashboardAPI.getStats(),
-          dashboardAPI.getActivity(7)
-        ]);
+        const [statsRes, actRes] = await Promise.all([dashboardAPI.getStats(), dashboardAPI.getActivity(7)]);
         setStats(statsRes.data);
-        setActivities(actRes.data?.activities?.slice(0, 6) || []);
+        setActivities(actRes.data?.activities?.slice(0, 5) || []);
       } catch { /* ignore */ }
 
-      const city = user?.location?.city || user?.location?.state || 'Delhi';
-      if (city) {
+      const tryWeather = async (cityOrCoord) => {
         try {
-          const wRes = await weatherAPI.getCurrent(city);
-          if (!wRes.data.error) setWeather(wRes.data);
+          const res = typeof cityOrCoord === 'object'
+            ? await weatherAPI.getByLocation(cityOrCoord.lat, cityOrCoord.lon)
+            : await weatherAPI.getCurrent(cityOrCoord);
+          if (res.data && !res.data.error) { setWeather(res.data); setGeoCity(res.data.city || ''); }
         } catch { /* ignore */ }
-      }
+      };
 
-      setLoading(false);
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => { await tryWeather({ lat: pos.coords.latitude, lon: pos.coords.longitude }); setLoading(false); },
+          async () => { await tryWeather(user?.location?.city || 'Delhi'); setLoading(false); },
+          { timeout: 5000 }
+        );
+      } else {
+        await tryWeather(user?.location?.city || 'Delhi');
+        setLoading(false);
+      }
     };
     load();
   }, [user]);
 
   const firstName = user?.name?.split(' ')[0] || 'Farmer';
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const statItems = [
+    { label: 'Chat Queries',  value: stats?.total_chats        || 0, color: '#1a7a3a', icon: '💬' },
+    { label: 'Crop AI',       value: stats?.crop_predictions   || 0, color: '#d97706', icon: '🌾' },
+    { label: 'Disease Scans', value: stats?.disease_detections || 0, color: '#dc2626', icon: '🔬' },
+    { label: 'Weather',       value: stats?.weather_checks     || 0, color: '#1e88e5', icon: '🌤️' },
+    { label: 'Market',        value: stats?.market_searches    || 0, color: '#7c3aed', icon: '📊' },
+    { label: 'This Week',     value: stats?.recent_activity    || 0, color: '#0891b2', icon: '📅' },
+  ];
 
   const featureCards = [
-    {
-      title: 'Crop Recommendation', desc: 'AI-powered crop suggestions based on soil & climate',
-      path: '/crop-recommendation', color: '#e8f5e9', accent: '#2d7a3a',
-      icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2d7a3a" strokeWidth="1.8"><path d="M7 20h10M12 20v-8" /><path d="M12 12C12 12 6 8 6 4c0-1.5 1.5-3 3-3 1.5 0 3 2 3 2s1.5-2 3-2c1.5 0 3 1.5 3 3 0 4-6 8-6 8z" /></svg>
-    },
-    {
-      title: 'Disease Detection', desc: 'Upload leaf image for AI plant disease analysis',
-      path: '/disease-detection', color: '#fff3e0', accent: '#e65100',
-      icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e65100" strokeWidth="1.8"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M11 8v6M8 11h6" /></svg>
-    },
-    {
-      title: 'AI Assistant', desc: 'Chat with AI expert — voice & text support',
-      path: '/chatbot', color: '#e3f2fd', accent: '#1565c0',
-      icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1565c0" strokeWidth="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-    },
-    {
-      title: 'Weather Forecast', desc: 'Real-time weather data for your location',
-      path: '/weather', color: '#fce4ec', accent: '#c62828',
-      icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c62828" strokeWidth="1.8"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z" /></svg>
-    },
+    { title: 'Crop Recommendation', path: '/crop-recommendation', accent: '#1a7a3a', bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', emoji: '🌾', stat: 'AI-powered for your soil' },
+    { title: 'Disease Detection',   path: '/disease-detection',   accent: '#d97706', bg: 'linear-gradient(135deg,#fffbeb,#fef3c7)', emoji: '🔬', stat: 'Upload leaf for diagnosis' },
+    { title: 'AI Assistant',        path: '/chatbot',              accent: '#1e88e5', bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)', emoji: '💬', stat: '13 Indian languages' },
+    { title: 'Market Prices',       path: '/market',               accent: '#7c3aed', bg: 'linear-gradient(135deg,#faf5ff,#ede9fe)', emoji: '📊', stat: 'Live mandi near you' },
   ];
 
   const quickActions = [
-    {
-      label: 'Market Prices', desc: 'Current mandi & MSP rates', path: '/market',
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6a4a" strokeWidth="1.8"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
-    },
-    {
-      label: 'Community', desc: 'Farmer discussions', path: '/community',
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6a4a" strokeWidth="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-    },
-    {
-      label: 'History', desc: 'Your activity log', path: '/history',
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6a4a" strokeWidth="1.8"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-    },
-    {
-      label: 'My Profile', desc: 'Manage your account', path: '/profile',
-      icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6a4a" strokeWidth="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-    },
+    { label: 'Market',   path: '/market',            emoji: '📊', color: '#7c3aed' },
+    { label: 'Weather',  path: '/weather',            emoji: '🌤️', color: '#1e88e5' },
+    { label: 'History',  path: '/history',            emoji: '📋', color: '#0891b2' },
+    { label: 'Profile',  path: '/profile',            emoji: '👤', color: '#1a7a3a' },
+    { label: 'Policies', path: '/gov-policies',       emoji: '🏛️', color: '#d97706' },
+    { label: 'Scans',    path: '/disease-detection',  emoji: '🔬', color: '#dc2626' },
   ];
 
   const typeIcons  = { chat: '💬', crop_prediction: '🌾', disease_detection: '🔬', weather: '🌤️', market: '📊' };
-  const typeColors  = { chat: '#2d7a3a', crop_prediction: '#4caf50', disease_detection: '#f5a623', weather: '#1e88e5', market: '#e53935' };
-  const typeLabels  = { chat: 'Chat', crop_prediction: 'Crop', disease_detection: 'Disease', weather: 'Weather', market: 'Market' };
+  const typeColors = { chat: '#1a7a3a', crop_prediction: '#d97706', disease_detection: '#dc2626', weather: '#1e88e5', market: '#7c3aed' };
+  const typeLabels = { chat: 'Chat', crop_prediction: 'Crop', disease_detection: 'Disease', weather: 'Weather', market: 'Market' };
 
-  if (loading) {
-    return <div className="flex-center" style={{ height: '60vh' }}><div className="spinner" /></div>;
-  }
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16 }}>
+      <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
+      <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading your dashboard…</p>
+    </div>
+  );
 
   return (
-    <div className="animate-fadeIn">
-      {/* Greeting */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, fontFamily: 'Outfit', color: '#1a2e1a' }}>
-          Welcome back, <span style={{ color: 'var(--primary)' }}>{firstName}</span>
-        </h1>
-        <p style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 4 }}>
-          Here's your farming dashboard for today
-        </p>
+    <div className="animate-fadeIn dash-page">
+
+      {/* ══ HERO BANNER ══════════════════════════════════════════════ */}
+      <div className="dash-hero">
+        <div style={{ position: 'absolute', inset: 0, opacity: 0.07, backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '36px 36px', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: -20, top: -20, fontSize: 140, opacity: 0.05, lineHeight: 1, pointerEvents: 'none' }}>🌿</div>
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div className="dash-hero-inner">
+            {/* Greeting */}
+            <div>
+              <p style={{ fontSize: 12, color: '#86efac', fontWeight: 700, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {getGreeting()} 👋
+              </p>
+              <h1 style={{ fontSize: 'clamp(20px, 4vw, 28px)', fontWeight: 900, color: 'white', fontFamily: 'Manrope, Outfit, sans-serif', letterSpacing: '-0.02em', margin: 0, lineHeight: 1.2 }}>
+                {firstName}, your farm is ready.
+              </h1>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 5 }}>{today}</p>
+
+              {/* Location / Weather chips */}
+              <div style={{ display: 'flex', gap: 7, marginTop: 12, flexWrap: 'wrap' }}>
+                {[
+                  { icon: '📍', text: geoCity || user?.location?.city || 'Your Location' },
+                  { icon: '🌤️', text: weather ? `${Math.round(weather.temperature)}°C · ${weather.description}` : 'Fetching…' },
+                  { icon: '🌾', text: 'Rabi Season' },
+                ].map((chip, i) => (
+                  <span key={i} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99,
+                    background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+                    fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.9)',
+                  }}>{chip.icon} {chip.text}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Hero mini stats */}
+            <div className="dash-hero-stats">
+              {[
+                { icon: '💬', label: 'Queries', value: stats?.total_chats || 0 },
+                { icon: '🔬', label: 'Scans',   value: stats?.disease_detections || 0 },
+                { icon: '📊', label: 'Markets', value: stats?.market_searches || 0 },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  padding: '12px 16px', borderRadius: 14, textAlign: 'center',
+                  background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.18)',
+                  backdropFilter: 'blur(8px)', minWidth: 70,
+                }}>
+                  <div style={{ fontSize: 18, marginBottom: 3 }}>{s.icon}</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: 'white', lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Feature Cards */}
-      <div className="dash-feature-grid" style={{ display: 'grid', gap: 14, marginBottom: 24 }}>
-        {featureCards.map(card => (
-          <div key={card.title} onClick={() => navigate(card.path)}
-            style={{
-              cursor: 'pointer', padding: '24px 20px', borderRadius: 16,
-              background: 'white', border: `1.5px solid ${card.color}`,
-              transition: 'all 0.25s ease', position: 'relative', overflow: 'hidden'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.transform = 'translateY(-4px)';
-              e.currentTarget.style.boxShadow = `0 12px 28px ${card.accent}20`;
-              e.currentTarget.style.borderColor = card.accent;
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = 'none';
-              e.currentTarget.style.borderColor = card.color;
-            }}>
-            <div style={{
-              width: 48, height: 48, borderRadius: 14, background: card.color,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14,
-              border: `1px solid ${card.accent}25`
-            }}>{card.icon}</div>
-            <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 6, color: '#1a2e1a' }}>{card.title}</h3>
-            <p style={{ fontSize: 12, color: '#6a8a6a', lineHeight: 1.4 }}>{card.desc}</p>
-            <svg style={{ position: 'absolute', top: 20, right: 16, opacity: 0.3 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={card.accent} strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+      {/* ══ FEATURE CARDS ════════════════════════════════════════════ */}
+      <div className="dash-features-grid">
+        {featureCards.map((card) => (
+          <div key={card.title} onClick={() => navigate(card.path)} style={{
+            cursor: 'pointer', borderRadius: 16, overflow: 'hidden',
+            background: card.bg, border: `1.5px solid ${card.accent}20`,
+            transition: 'all 0.22s cubic-bezier(.4,0,.2,1)',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 10px 28px ${card.accent}24`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.04)'; }}
+          >
+            <div style={{ height: 3, background: `linear-gradient(90deg, ${card.accent}, ${card.accent}66)` }} />
+            <div style={{ padding: '16px' }}>
+              <div style={{ fontSize: 22, marginBottom: 10, width: 40, height: 40, borderRadius: 12, background: `${card.accent}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${card.accent}18` }}>{card.emoji}</div>
+              <h3 style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, color: '#181c1b' }}>{card.title}</h3>
+              <p style={{ fontSize: 11, color: card.accent, fontWeight: 600 }}>{card.stat}</p>
+              <div style={{ marginTop: 10, fontSize: 11, fontWeight: 700, color: card.accent }}>Open →</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Stats + Weather Row */}
-      <div className="dash-stats-grid" style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
+      {/* ══ MAIN CONTENT GRID ════════════════════════════════════════ */}
+      <div className="dash-main-grid">
+
         {/* Activity Summary */}
-        <div className="card">
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
-            Activity Summary
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {[
-              { label: 'Chat Queries', value: stats?.total_chats || 0 },
-              { label: 'Crop Predictions', value: stats?.crop_predictions || 0 },
-              { label: 'Disease Scans', value: stats?.disease_detections || 0 },
-              { label: 'Weather Checks', value: stats?.weather_checks || 0 },
-              { label: 'Market Searches', value: stats?.market_searches || 0 },
-              { label: 'This Week', value: stats?.recent_activity || 0 },
-            ].map(s => (
+        <div style={{ background: 'white', borderRadius: 16, border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
+          <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(90deg,#f0fdf4,#fff)' }}>
+            <div>
+              <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>📈 Activity Summary</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>All features combined</p>
+            </div>
+            <span style={{ fontSize: 10, padding: '2px 9px', borderRadius: 99, background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>Live</span>
+          </div>
+          <div style={{ padding: '14px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {statItems.map((s) => (
               <div key={s.label} style={{
-                padding: 14, borderRadius: 10, background: 'var(--bg-input)', textAlign: 'center',
-                border: '1px solid var(--border-light)'
+                padding: '12px 8px', borderRadius: 12, textAlign: 'center',
+                background: `${s.color}08`, border: `1.5px solid ${s.color}15`,
               }}>
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 4 }}>{s.label}</p>
-                <p style={{ fontSize: 24, fontWeight: 800, color: 'var(--primary)' }}>{s.value}</p>
+                <div style={{ fontSize: 16, marginBottom: 4 }}>{s.icon}</div>
+                <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1, marginBottom: 3 }}>
+                  <AnimatedNumber value={s.value} color={s.color} />
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
+                <div style={{ height: 3, borderRadius: 99, background: `${s.color}20`, overflow: 'hidden', marginTop: 7 }}>
+                  <div style={{ height: '100%', width: `${Math.min(100, (s.value / 50) * 100)}%`, background: s.color, borderRadius: 99, transition: 'width 1.2s' }} />
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Weather */}
-        <div className="card" style={{ background: 'linear-gradient(135deg, #f5f9f5, #fff8e1)', border: '1px solid #e0e8d8' }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e65100" strokeWidth="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z" /></svg>
-            Today's Weather
-          </h3>
-          {weather ? (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-                <div style={{ fontSize: 48, lineHeight: 1 }}>{weather.icon || '🌤️'}</div>
-                <div>
-                  <p style={{ fontSize: 32, fontWeight: 800, lineHeight: 1, color: '#1a2e1a' }}>{weather.temperature}°C</p>
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', textTransform: 'capitalize', marginTop: 2 }}>{weather.description}</p>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{weather.city}{weather.state ? `, ${weather.state}` : ''}</p>
+        {/* Right column: Weather + Quick Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Weather */}
+          <div style={{
+            borderRadius: 16, overflow: 'hidden',
+            background: weather ? 'linear-gradient(135deg, #1e3a5f, #1565c0)' : 'linear-gradient(135deg, #1b3a26, #1a7a3a)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+          }}>
+            {weather ? (
+              <div style={{ padding: '18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div>
+                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>☁️ Weather</p>
+                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>{weather.city}{weather.state ? `, ${weather.state}` : ''}</p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 32, fontWeight: 900, color: 'white', lineHeight: 1 }}>{Math.round(weather.temperature)}°</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>Feels {Math.round(weather.feels_like || weather.temperature)}°</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                  <span style={{ fontSize: 22 }}>{weather.icon || '🌤️'}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 600, textTransform: 'capitalize' }}>{weather.description}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+                  {[
+                    { label: 'Humidity', value: `${weather.humidity}%`, icon: '💧' },
+                    { label: 'Wind', value: `${weather.wind_speed}km/h`, icon: '💨' },
+                    { label: 'UV', value: String(weather.uv_index ?? '—'), icon: '☀️' },
+                  ].map(w => (
+                    <div key={w.label} style={{ padding: '8px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.10)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 12 }}>{w.icon}</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'white' }}>{w.value}</div>
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 1 }}>{w.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.12)', fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+                  ✅ Good conditions for field work
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {[
-                  { label: 'Humidity', value: `${weather.humidity}%` },
-                  { label: 'Wind', value: `${weather.wind_speed} km/h` },
-                  { label: 'Feels Like', value: `${weather.feels_like}°C` },
-                ].map(w => (
-                  <div key={w.label} style={{ padding: 10, borderRadius: 8, background: 'white', textAlign: 'center', border: '1px solid #e8e8e8' }}>
-                    <p style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>{w.label}</p>
-                    <p style={{ fontSize: 16, fontWeight: 700, color: '#1a2e1a', marginTop: 2 }}>{w.value}</p>
-                  </div>
-                ))}
+            ) : (
+              <div style={{ padding: '24px 18px', textAlign: 'center', color: 'white' }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>🌤️</div>
+                <p style={{ fontWeight: 700, marginBottom: 6, fontSize: 14 }}>Weather unavailable</p>
+                <button onClick={() => navigate('/weather')} style={{ padding: '7px 16px', borderRadius: 99, border: '1.5px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Check Weather →</button>
               </div>
+            )}
+          </div>
+
+          {/* Quick Actions */}
+          <div style={{ background: 'white', borderRadius: 16, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+            <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border-light)' }}>
+              <h3 style={{ fontSize: 13, fontWeight: 800, margin: 0 }}>⚡ Quick Actions</h3>
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 13 }}>
-              <p>Weather data not available</p>
-              <button onClick={() => navigate('/weather')} className="btn btn-primary btn-sm" style={{ marginTop: 10 }}>
-                Check Weather
-              </button>
+            <div style={{ padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
+              {quickActions.map(a => (
+                <button key={a.label} onClick={() => navigate(a.path)} style={{
+                  padding: '10px 6px', borderRadius: 10, cursor: 'pointer',
+                  border: `1.5px solid ${a.color}18`, background: `${a.color}07`,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  transition: 'all 0.15s',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.background = `${a.color}14`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = `${a.color}07`; e.currentTarget.style.transform = 'none'; }}
+                >
+                  <span style={{ fontSize: 18 }}>{a.emoji}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: a.color }}>{a.label}</span>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: '#1a2e1a' }}>Quick Actions</h3>
-      <div className="dash-quick-grid" style={{ display: 'grid', gap: 12, marginBottom: 24 }}>
-        {quickActions.map(a => (
-          <div key={a.label} className="card card-hover" onClick={() => navigate(a.path)}
-            style={{
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, padding: 16,
-              transition: 'transform 0.15s'
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10, background: '#e8f5e9',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}>{a.icon}</div>
-            <div>
-              <p style={{ fontWeight: 600, fontSize: 13, color: '#1a2e1a' }}>{a.label}</p>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.desc}</p>
-            </div>
+      {/* ══ RECENT ACTIVITY ══════════════════════════════════════════ */}
+      <div style={{ background: 'white', borderRadius: 16, border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
+        <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border-light)', background: 'linear-gradient(90deg,#f0fdf4,#fff)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>📋 Recent Activity</h3>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Latest queries & actions</p>
           </div>
-        ))}
+          <button onClick={() => navigate('/history')} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 11, fontWeight: 700, border: '1px solid var(--border)', background: 'white', color: 'var(--text-secondary)', cursor: 'pointer' }}>View all →</button>
+        </div>
+
+        {activities.length === 0 ? (
+          <div style={{ padding: '36px 16px', textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>📭</div>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 280, margin: '0 auto' }}>No activity yet. Start using the features above!</p>
+          </div>
+        ) : activities.map((act, i) => {
+          const accent = typeColors[act.type] || '#1a7a3a';
+          const emoji  = typeIcons[act.type]  || '📋';
+          const label  = typeLabels[act.type] || 'Activity';
+          const q = (act.query || '').replace(/Weather:\s*Lat[\d.,\s]+Lon[\d.,\s]+/i, '🌤️ Weather Check').substring(0, 70);
+          return (
+            <div key={i} style={{
+              padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+              borderBottom: i < activities.length - 1 ? '1px solid var(--border-light)' : 'none',
+              borderLeft: `3px solid ${accent}`, transition: 'background 0.1s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = `${accent}05`}
+              onMouseLeave={e => e.currentTarget.style.background = ''}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: `${accent}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{q}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {new Date(act.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })}
+                </p>
+              </div>
+              <span style={{ padding: '2px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700, background: `${accent}12`, color: accent, flexShrink: 0 }}>{label}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Recent Activity */}
-      <h3 style={{ fontSize: 17, fontWeight: 800, marginBottom: 12, color: '#1a2e1a' }}>📋 Recent Activity</h3>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {activities.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-            <p style={{ fontSize: 28, marginBottom: 8 }}>📭</p>
-            No recent activity. Start exploring the features above!
-          </div>
-        ) : (
-          activities.map((act, i) => {
-            const accent = typeColors[act.type] || ['#2d7a3a','#1565c0','#7b1fa2','#e65100','#e53935'][i % 5];
-            const emoji  = typeIcons[act.type] || '📋';
-            return (
-              <div key={i} style={{
-                padding: '13px 20px', display: 'flex', alignItems: 'center', gap: 14,
-                borderBottom: i < activities.length - 1 ? '1px solid var(--border-light)' : 'none',
-                borderLeft: `3px solid ${accent}`, transition: 'background 0.15s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input)'}
-                onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 10, background: `${accent}14`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 18, flexShrink: 0,
-                }}>{emoji}</div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: '#1a2e1a', margin: 0 }}>{act.query?.substring(0, 80)}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                    {new Date(act.timestamp).toLocaleString('en-IN')}
-                  </p>
-                </div>
-                <span style={{
-                  padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                  background: `${accent}12`, color: accent,
-                }}>
-                  {typeLabels[act.type] || 'Activity'}
-                </span>
-              </div>
-            );
-          })
-        )}
-      </div>
+      <div style={{ height: 16 }} />
     </div>
   );
 }

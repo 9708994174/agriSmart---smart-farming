@@ -89,28 +89,30 @@ export default function RegisterPage() {
         {/* ─── STEP 1: Basic Details ─── */}
         {step === 1 && (
           <>
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Full Name</label>
-              <input required style={inputStyle} placeholder="Enter your full name"
-                value={form.name} onChange={set('name')} {...focusHandlers} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Full Name</label>
+                <input required style={inputStyle} placeholder="Enter your full name"
+                  value={form.name} onChange={set('name')} {...focusHandlers} />
+              </div>
+              <div>
+                <label style={labelStyle}>Email Address</label>
+                <input required type="email" style={inputStyle} placeholder="you@example.com"
+                  value={form.email} onChange={set('email')} {...focusHandlers} />
+              </div>
             </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Email Address</label>
-              <input required type="email" style={inputStyle} placeholder="you@example.com"
-                value={form.email} onChange={set('email')} {...focusHandlers} />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Password</label>
-              <input required type="password" style={inputStyle} placeholder="Min 6 characters"
-                value={form.password} onChange={set('password')} {...focusHandlers} />
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={labelStyle}>Confirm Password</label>
-              <input required type="password" style={inputStyle} placeholder="Re-enter password"
-                value={form.confirmPassword} onChange={set('confirmPassword')} {...focusHandlers} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+              <div>
+                <label style={labelStyle}>Password</label>
+                <input required type="password" style={inputStyle} placeholder="Min 6 chars"
+                  value={form.password} onChange={set('password')} {...focusHandlers} />
+              </div>
+              <div>
+                <label style={labelStyle}>Confirm</label>
+                <input required type="password" style={inputStyle} placeholder="Re-enter password"
+                  value={form.confirmPassword} onChange={set('confirmPassword')} {...focusHandlers} />
+              </div>
             </div>
 
             <button type="submit" style={{

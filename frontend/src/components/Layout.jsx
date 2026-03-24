@@ -84,22 +84,33 @@ export default function Layout() {
   const typeLabels = { chat: 'Chat', crop_prediction: 'Crop', disease_detection: 'Disease', weather: 'Weather', market: 'Market' };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-body)' }}>
       {/* Mobile sidebar overlay */}
       <div
         className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
         onClick={() => setSidebarOpen(false)}
       />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      {/* Right side: topbar + scrollable content, takes remaining width */}
       <main className="main-content" style={{
-        flex: 1, minHeight: '100vh', overflowX: 'hidden',
-        background: 'var(--bg-body)', display: 'flex', flexDirection: 'column'
+        flex: 1,
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',        /* prevent the main from ever growing the page */
+        background: 'var(--bg-body)',
       }}>
         {/* ─── Top Bar ─── */}
-        <div className="topbar-container" style={{
+        <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '10px 16px', background: 'white', borderBottom: '1px solid var(--border-light)',
-          position: 'sticky', top: 0, zIndex: 50
+          padding: '10px 20px',
+          background: 'white',
+          borderBottom: '1px solid var(--border-light)',
+          flexShrink: 0,          /* NEVER shrink — always stays at top */
+          zIndex: 50,
+          boxShadow: '0 1px 4px rgba(24,28,27,0.06)',
+          minHeight: 58,
         }}>
           {/* Hamburger button — visible only on mobile */}
           <button
@@ -192,8 +203,14 @@ export default function Layout() {
           </button>
         </div>
 
-        {/* Page content — overflow hidden prevents tables from widening the entire page */}
-        <div style={{ flex: 1, padding: '16px', overflowX: 'hidden', maxWidth: '100%' }}>
+        {/* ─── Scrollable page content ─── */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',      /* ONLY this div scrolls */
+          overflowX: 'hidden',
+          padding: '20px 24px',
+          WebkitOverflowScrolling: 'touch',
+        }}>
           <Outlet />
         </div>
       </main>

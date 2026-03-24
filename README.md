@@ -467,3 +467,8 @@ This project is developed as a capstone project for academic purposes.
 ## Authors
 
 AgriSmart Team - 2026
+
+
+python -m venv venv
+venv\Scripts\activate
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
