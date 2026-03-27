@@ -1,7 +1,10 @@
 {
-  "model_type": "RandomForestClassifier",
-  "n_estimators": 100,
-  "accuracy": 0.9477,
+  "model_type": "VotingClassifier (RandomForest + GradientBoosting)",
+  "n_estimators_rf": 200,
+  "n_estimators_gb": 150,
+  "accuracy": 0.8318,
+  "cv_accuracy": 0.8398,
+  "cv_std": 0.0061,
   "features": [
     "N",
     "P",
@@ -12,27 +15,130 @@
     "rainfall"
   ],
   "classes": [
+    "banana",
+    "barley",
     "chickpea",
     "cotton",
+    "garlic",
     "groundnut",
+    "jute",
+    "lentil",
     "maize",
+    "mango",
+    "moong",
     "mustard",
+    "onion",
+    "pigeonpea",
     "potato",
     "rice",
+    "sorghum",
     "soybean",
     "sugarcane",
+    "sunflower",
     "tomato",
     "wheat"
   ],
-  "feature_importance": {
-    "N": 0.2119,
-    "P": 0.0936,
-    "K": 0.1837,
-    "temperature": 0.1366,
-    "humidity": 0.1061,
-    "ph": 0.0765,
-    "rainfall": 0.1916
+  "n_classes": 22,
+  "crops_config": {
+    "banana": {
+      "season": "Year-round (tropical)",
+      "description": "High-value fruit crop suited for tropical and subtropical regions. Requires well-drained fertile soil and high humidity."
+    },
+    "barley": {
+      "season": "Rabi (October - March)",
+      "description": "Hardy cereal crop tolerant of poor soils. Used for food, malt, and animal feed. Grows well in cooler regions."
+    },
+    "chickpea": {
+      "season": "Rabi (October - March)",
+      "description": "A key pulse crop that fixes atmospheric nitrogen. Drought-tolerant and suitable for rainfed conditions."
+    },
+    "cotton": {
+      "season": "Kharif (April - October)",
+      "description": "Major cash crop best suited for black cotton soil (regur). Requires warm climate with moderate rainfall."
+    },
+    "garlic": {
+      "season": "Rabi (October - February)",
+      "description": "High-value bulb crop. Prefers cool weather during bulb development. Well-drained loamy soils produce best quality."
+    },
+    "groundnut": {
+      "season": "Kharif (June - October)",
+      "description": "Important oilseed and food crop. Requires sandy loam or red soil with good drainage."
+    },
+    "jute": {
+      "season": "Kharif (March - August)",
+      "description": "Natural fiber crop requiring hot and humid climate. Best grown in alluvial soil of West Bengal and Assam."
+    },
+    "lentil": {
+      "season": "Rabi (October - February)",
+      "description": "High-protein pulse crop best in cool, dry weather. Fixes nitrogen and improves soil health."
+    },
+    "maize": {
+      "season": "Kharif / Rabi (Dual Season)",
+      "description": "Versatile cereal crop used for food, fodder, and industrial purposes. Grows well in diverse climatic conditions."
+    },
+    "mango": {
+      "season": "Summer (March - June)",
+      "description": "King of fruits \u2014 requires distinct dry and wet seasons. Deep, well-drained alluvial or loamy soils are ideal."
+    },
+    "moong": {
+      "season": "Kharif (June - September)",
+      "description": "Short-duration summer pulse rich in protein. Well-suited for sandy loam soils with moderate rainfall."
+    },
+    "mustard": {
+      "season": "Rabi (October - March)",
+      "description": "Important oilseed crop for northern India. Requires cool, dry weather during growth and warm conditions for maturity."
+    },
+    "onion": {
+      "season": "Rabi (October - February)",
+      "description": "Essential vegetable crop with strong market demand. Requires moderate climate and well-drained loamy soil."
+    },
+    "pigeonpea": {
+      "season": "Kharif (June - October)",
+      "description": "Drought-tolerant perennial/annual pulse. Widely grown in peninsular India on various soil types."
+    },
+    "potato": {
+      "season": "Rabi (October - February)",
+      "description": "Cool-season vegetable crop. India is the second-largest producer. Requires well-drained, loose, sandy loam soil."
+    },
+    "rice": {
+      "season": "Kharif (June - October)",
+      "description": "A staple cereal crop ideal for warm, humid conditions with heavy irrigation. Grows best in paddy fields with clay or loamy soil."
+    },
+    "sorghum": {
+      "season": "Kharif (June - September)",
+      "description": "Drought-tolerant cereal ideal for dryland farming. Good for semi-arid regions with limited water supply."
+    },
+    "soybean": {
+      "season": "Kharif (June - October)",
+      "description": "High-protein oilseed crop. Major crop in Madhya Pradesh and Maharashtra. Suitable for black and red soils."
+    },
+    "sugarcane": {
+      "season": "Annual (10-18 months)",
+      "description": "Long-duration commercial crop used for sugar production. Requires tropical climate and heavy irrigation."
+    },
+    "sunflower": {
+      "season": "Kharif / Rabi (Both Seasons)",
+      "description": "Oilseed crop with high yield and adaptability. Tolerant of varied soils, high demand for edible oil."
+    },
+    "tomato": {
+      "season": "Year-round (varies by region)",
+      "description": "Major vegetable crop grown across India. Requires moderate climate and well-drained fertile soil."
+    },
+    "wheat": {
+      "season": "Rabi (November - March)",
+      "description": "India's primary Rabi crop. Requires cool growing conditions and moderate water. Ideal for Indo-Gangetic plains."
+    }
   },
-  "training_samples": 1760,
-  "test_samples": 440
+  "feature_importance": {
+    "N": 0.1892,
+    "P": 0.1295,
+    "K": 0.1833,
+    "temperature": 0.1493,
+    "humidity": 0.1112,
+    "ph": 0.0954,
+    "rainfall": 0.1421
+  },
+  "training_samples": 5280,
+  "test_samples": 1320,
+  "total_samples": 6600
 }
