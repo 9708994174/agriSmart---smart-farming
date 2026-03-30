@@ -695,12 +695,12 @@ tbody tr { transition: background 0.12s; }
   gap: 12px;
 }
 
-/* ── Main 2-column grid (Activity + Weather/Actions) ── */
-.dash-main-grid {
+/* ── Main 2-column grid (Activity + Weather) ── */
+.dash-aw-grid {
   display: grid;
-  grid-template-columns: 1.55fr 1fr;
+  grid-template-columns: 55fr 45fr;
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* ── Tablet (≤ 1024px): 2 feature cols ── */
@@ -711,7 +711,8 @@ tbody tr { transition: background 0.12s; }
 /* ── Mobile (≤ 768px): stack everything ── */
 @media (max-width: 768px) {
   .dash-features-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .dash-main-grid     { grid-template-columns: 1fr; }
+  .dash-aw-grid       { grid-template-columns: 1fr; }
+  .dash-quick-actions { grid-template-columns: repeat(3, 1fr) !important; padding: 12px !important; gap: 8px !important; }
   .dash-hero          { padding: 18px 16px; border-radius: 14px; }
   .dash-hero-inner    { flex-direction: column; gap: 14px; }
   .dash-hero-stats    { width: 100%; justify-content: flex-start; }
@@ -720,6 +721,7 @@ tbody tr { transition: background 0.12s; }
 /* ── Small mobile (≤ 480px): tighten spacing ── */
 @media (max-width: 480px) {
   .dash-features-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dash-quick-actions { grid-template-columns: repeat(2, 1fr) !important; gap: 6px !important; padding: 10px !important; }
   .dash-page          { gap: 12px; }
 }
 
@@ -821,7 +823,7 @@ tbody tr { transition: background 0.12s; }
 .sidebar-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 50%;
   background: var(--gradient-primary);
   display: flex;
   align-items: center;
@@ -1111,8 +1113,6 @@ tbody tr { transition: background 0.12s; }
 
 /* ── Tablet: ≤1024px ── */
 @media (max-width: 1024px) {
-  .sidebar { width: 220px; }
-  .main-content { margin-left: 220px !important; }
   .dash-feature-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .dash-quick-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }

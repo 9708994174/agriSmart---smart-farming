@@ -15,6 +15,7 @@ export default function Layout() {
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Guard: prevent ghost-click from opening panel right after navigation
   const [panelGuard, setPanelGuard] = useState(false);
   const searchRef = useRef(null);
@@ -90,7 +91,12 @@ export default function Layout() {
         className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
         onClick={() => setSidebarOpen(false)}
       />
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(c => !c)}
+      />
 
       {/* Right side: topbar + scrollable content, takes remaining width */}
       <main className="main-content" style={{
@@ -98,8 +104,10 @@ export default function Layout() {
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',        /* prevent the main from ever growing the page */
+        overflow: 'hidden',
         background: 'var(--bg-body)',
+        marginLeft: sidebarCollapsed ? 64 : 240,
+        transition: 'margin-left 0.25s cubic-bezier(.4,0,.2,1)',
       }}>
         {/* ─── Top Bar ─── */}
         <div style={{

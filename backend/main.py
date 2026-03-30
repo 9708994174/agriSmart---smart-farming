@@ -13,6 +13,7 @@ from routes.weather_market import router as weather_market_router
 from routes.dashboard import router as dashboard_router
 from routes.feedback import router as feedback_router
 from routes.community import router as community_router
+from routes.expert_guidelines import router as expert_guidelines_router
 
 settings = get_settings()
 
@@ -84,6 +85,7 @@ app.include_router(weather_market_router, prefix="/api", tags=["Weather and Mark
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(feedback_router, prefix="/api", tags=["Feedback"])
 app.include_router(community_router, prefix="/api/community", tags=["Community"])
+app.include_router(expert_guidelines_router, prefix="/api/expert-guidelines", tags=["Expert Guidelines"])
 
 
 @app.get("/")

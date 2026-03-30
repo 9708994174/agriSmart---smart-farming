@@ -186,8 +186,8 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* ══ MAIN CONTENT GRID ════════════════════════════════════════ */}
-      <div className="dash-main-grid">
+      {/* ══ MAIN CONTENT GRID: Activity + Weather side-by-side ══════════════ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '55fr 45fr', gap: 14, alignItems: 'stretch' }} className="dash-aw-grid">
 
         {/* Activity Summary */}
         <div style={{ background: 'white', borderRadius: 16, border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
@@ -200,10 +200,7 @@ export default function DashboardPage() {
           </div>
           <div style={{ padding: '14px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {statItems.map((s) => (
-              <div key={s.label} style={{
-                padding: '12px 8px', borderRadius: 12, textAlign: 'center',
-                background: `${s.color}08`, border: `1.5px solid ${s.color}15`,
-              }}>
+              <div key={s.label} style={{ padding: '12px 8px', borderRadius: 12, textAlign: 'center', background: `${s.color}08`, border: `1.5px solid ${s.color}15` }}>
                 <div style={{ fontSize: 16, marginBottom: 4 }}>{s.icon}</div>
                 <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1, marginBottom: 3 }}>
                   <AnimatedNumber value={s.value} color={s.color} />
@@ -217,80 +214,81 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right column: Weather + Quick Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Weather */}
-          <div style={{
-            borderRadius: 16, overflow: 'hidden',
-            background: weather ? 'linear-gradient(135deg, #1e3a5f, #1565c0)' : 'linear-gradient(135deg, #1b3a26, #1a7a3a)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
-          }}>
-            {weather ? (
-              <div style={{ padding: '18px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <div>
-                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>☁️ Weather</p>
-                    <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>{weather.city}{weather.state ? `, ${weather.state}` : ''}</p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 32, fontWeight: 900, color: 'white', lineHeight: 1 }}>{Math.round(weather.temperature)}°</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>Feels {Math.round(weather.feels_like || weather.temperature)}°</div>
-                  </div>
+        {/* Weather — same height as Activity */}
+        <div style={{
+          borderRadius: 16, overflow: 'hidden',
+          background: weather ? 'linear-gradient(135deg, #1e3a5f, #1565c0)' : 'linear-gradient(135deg, #1b3a26, #1a7a3a)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          {weather ? (
+            <div style={{ padding: '18px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <div>
+                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>☁️ Weather</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>{weather.city}{weather.state ? `, ${weather.state}` : ''}</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                  <span style={{ fontSize: 22 }}>{weather.icon || '🌤️'}</span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 600, textTransform: 'capitalize' }}>{weather.description}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
-                  {[
-                    { label: 'Humidity', value: `${weather.humidity}%`, icon: '💧' },
-                    { label: 'Wind', value: `${weather.wind_speed}km/h`, icon: '💨' },
-                    { label: 'UV', value: String(weather.uv_index ?? '—'), icon: '☀️' },
-                  ].map(w => (
-                    <div key={w.label} style={{ padding: '8px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.10)', textAlign: 'center' }}>
-                      <div style={{ fontSize: 12 }}>{w.icon}</div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: 'white' }}>{w.value}</div>
-                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 1 }}>{w.label}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.12)', fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
-                  ✅ Good conditions for field work
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 32, fontWeight: 900, color: 'white', lineHeight: 1 }}>{Math.round(weather.temperature)}°</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>Feels {Math.round(weather.feels_like || weather.temperature)}°</div>
                 </div>
               </div>
-            ) : (
-              <div style={{ padding: '24px 18px', textAlign: 'center', color: 'white' }}>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>🌤️</div>
-                <p style={{ fontWeight: 700, marginBottom: 6, fontSize: 14 }}>Weather unavailable</p>
-                <button onClick={() => navigate('/weather')} style={{ padding: '7px 16px', borderRadius: 99, border: '1.5px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Check Weather →</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <span style={{ fontSize: 22 }}>{weather.icon || '🌤️'}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 600, textTransform: 'capitalize' }}>{weather.description}</span>
               </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div style={{ background: 'white', borderRadius: 16, border: '1px solid var(--border-light)', overflow: 'hidden' }}>
-            <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border-light)' }}>
-              <h3 style={{ fontSize: 13, fontWeight: 800, margin: 0 }}>⚡ Quick Actions</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+                {[
+                  { label: 'Humidity', value: `${weather.humidity}%`, icon: '💧' },
+                  { label: 'Wind',     value: `${weather.wind_speed}km/h`, icon: '💨' },
+                  { label: 'UV',       value: String(weather.uv_index ?? '—'), icon: '☀️' },
+                ].map(w => (
+                  <div key={w.label} style={{ padding: '8px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.10)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 12 }}>{w.icon}</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: 'white' }}>{w.value}</div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 1 }}>{w.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.12)', fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+                ✅ Good conditions for field work
+              </div>
             </div>
-            <div style={{ padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
-              {quickActions.map(a => (
-                <button key={a.label} onClick={() => navigate(a.path)} style={{
-                  padding: '10px 6px', borderRadius: 10, cursor: 'pointer',
-                  border: `1.5px solid ${a.color}18`, background: `${a.color}07`,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  transition: 'all 0.15s',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.background = `${a.color}14`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = `${a.color}07`; e.currentTarget.style.transform = 'none'; }}
-                >
-                  <span style={{ fontSize: 18 }}>{a.emoji}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: a.color }}>{a.label}</span>
-                </button>
-              ))}
+          ) : (
+            <div style={{ padding: '24px 18px', textAlign: 'center', color: 'white', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🌤️</div>
+              <p style={{ fontWeight: 700, marginBottom: 6, fontSize: 14 }}>Weather unavailable</p>
+              <button onClick={() => navigate('/weather')} style={{ padding: '7px 16px', borderRadius: 99, border: '1.5px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Check Weather →</button>
             </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* ══ QUICK ACTIONS — full-width row ══════════════════════════════════ */}
+      <div style={{ background: 'white', borderRadius: 16, border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>
+        <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--border-light)', background: 'linear-gradient(90deg,#f0fdf4,#fff)' }}>
+          <h3 style={{ fontSize: 13, fontWeight: 800, margin: 0 }}>⚡ Quick Actions</h3>
+        </div>
+        <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }} className="dash-quick-actions">
+          {quickActions.map(a => (
+            <button key={a.label} onClick={() => navigate(a.path)} style={{
+              padding: '14px 8px', borderRadius: 12, cursor: 'pointer',
+              border: `1.5px solid ${a.color}20`, background: `${a.color}07`,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              transition: 'all 0.15s', fontFamily: 'inherit',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${a.color}14`; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 14px ${a.color}22`; }}
+              onMouseLeave={e => { e.currentTarget.style.background = `${a.color}07`; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <span style={{ fontSize: 22 }}>{a.emoji}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: a.color }}>{a.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+
+
 
       {/* ══ RECENT ACTIVITY ══════════════════════════════════════════ */}
       <div style={{ background: 'white', borderRadius: 16, border: '1px solid var(--border-light)', overflow: 'hidden', boxShadow: 'var(--shadow-card)' }}>

@@ -17,6 +17,7 @@ import HistoryPage from './pages/HistoryPage';
 import ProfilePage from './pages/ProfilePage';
 import GovPoliciesPage from './pages/GovPoliciesPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ExpertGuidelinesPage from './pages/ExpertGuidelinesPage';
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="/market" element={<MarketPage />} />
             <Route path="/gov-policies" element={<GovPoliciesPage />} />
             <Route path="/community" element={<CommunityPage />} />
+            <Route path="/expert-guidelines" element={<ExpertGuidelinesPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>

@@ -137,4 +137,10 @@ export const communityAPI = {
   deletePost: (postId) => api.delete(`/community/posts/${postId}`),
 };
 
+export const expertGuidelinesAPI = {
+  getAll:    ()           => api.get('/expert-guidelines/'),
+  getDetail: (id)         => api.get(`/expert-guidelines/${id}`),
+  search:    (query)      => api.get(`/expert-guidelines/search/${encodeURIComponent(query)}`),
+};
+
 export default api;

@@ -437,7 +437,7 @@ export default function CropRecommendationPage() {
           🌾 Crop Recommendation
         </h1>
         <p style={{ color:'#6b7280', marginTop:4, fontSize:13 }}>
-          Enter your soil &amp; climate parameters to get the best crop suggestions for your field
+          Enter your soil &amp; climate parameters to get AI-powered crop suggestions for your field.
         </p>
       </div>
 
@@ -567,15 +567,10 @@ export default function CropRecommendationPage() {
               padding:'48px 32px', textAlign:'center',
             }}>
               <div style={{ fontSize:64, marginBottom:20 }}>🌱</div>
-              <h3 style={{ fontSize:20, fontWeight:800, color:'#052e16', marginBottom:8 }}>ML Recommendation</h3>
-              <p style={{ fontSize:14, color:'#6b7280', maxWidth:380, lineHeight:1.8 }}>
-                Fill in your soil &amp; climate parameters and click <strong style={{ color:'#16a34a' }}>"Get Recommendation"</strong> to see which crops are best suited for your field.
+              <h3 style={{ fontSize:20, fontWeight:800, color:'#052e16', marginBottom:8 }}>Smart Crop Advisor</h3>
+              <p style={{ fontSize:14, color:'#6b7280', maxWidth:420, lineHeight:1.8 }}>
+                Fill in your soil &amp; climate parameters and click <strong style={{ color:'#16a34a' }}>"Get Recommendation"</strong> to get the best crop predictions for your field.
               </p>
-              <div style={{ display:'flex', gap:10, marginTop:20, flexWrap:'wrap', justifyContent:'center' }}>
-                {['Random Forest', 'Gradient Boosting', '22 Crops', '6,600 Samples', 'No External API'].map((t,i)=>(
-                  <span key={i} style={{ fontSize:11, padding:'4px 12px', borderRadius:99, background:'white', border:'1.5px solid #d1fae5', color:'#166534', fontWeight:600 }}>{t}</span>
-                ))}
-              </div>
             </div>
           )}
 
@@ -585,8 +580,8 @@ export default function CropRecommendationPage() {
               minHeight:420, borderRadius:20, background:'#f9fafb', border:'1.5px solid #e5e7eb',
             }}>
               <div className="spinner" style={{ width:48, height:48, borderWidth:4, borderTopColor:'#16a34a', borderColor:'rgba(22,163,74,0.15)', marginBottom:20 }}/>
-              <p style={{ fontSize:14, color:'#374151', fontWeight:600 }}>Running ML prediction…</p>
-              <p style={{ fontSize:12, color:'#9ca3af', marginTop:4 }}>Random Forest + Gradient Boosting ensemble</p>
+              <p style={{ fontSize:14, color:'#374151', fontWeight:700 }}>Analysing your field parameters…</p>
+              <p style={{ fontSize:12, color:'#9ca3af', marginTop:4, maxWidth:300, textAlign:'center' }}>This usually takes a few seconds</p>
             </div>
           )}
 
